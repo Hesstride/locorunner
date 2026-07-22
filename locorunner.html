@@ -1479,9 +1479,12 @@ async function onbGenerateFirst(){
       headers:apiHeaders(getApiKey()),
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:900,system:sys,messages:[{role:'user',content:user}]})
     });
+    trackUsage(res);
     const data=await res.json();
     if(data.error){
-      onbGenError(data.error.type==='authentication_error'?'Tu API key no es válida.':'No se pudo generar ('+data.error.type+').');
+      onbGenError(data.error.type==='authentication_error'?'Tu API key no es válida.'
+        :data.error.type==='rate_limit_error'?data.error.message
+        :'No se pudo generar ('+data.error.type+').');
       return;
     }
     const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n\n')||'Sin respuesta.';
@@ -2292,6 +2295,7 @@ async function getAIDailyMessage(key){
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:120,system:sys,messages:[{role:'user',content:user}]})
     });
     if(!res.ok) throw new Error('api '+res.status);
+    trackUsage(res);
     const data=await res.json();
     let msg=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
     if(!msg) throw new Error('empty');
@@ -3946,7 +3950,97 @@ function apiUrl(){
 function apiHeaders(key){
   // La API key ya vive en el servidor (variable de entorno del proxy).
   // No la mandamos desde el cliente — el proxy la añade él solo.
-  return {'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+  return {'Content-Type':'application/json','anthropic-version':'2023-06-01','x-user-id':getUserId()};
+}
+
+// Identificador anónimo por dispositivo — el proxy lo usa para contar
+// las consultas mensuales de cada usuario y aplicar el límite.
+// No es una cuenta ni requiere login: es solo un código aleatorio guardado
+// en este navegador. Si el usuario borra los datos del navegador, se le
+// genera uno nuevo (empezaría a contar de cero).
+function getUserId(){
+  let id=localStorage.getItem('locorunner_uid');
+  if(!id){
+    id=(crypto.randomUUID?crypto.randomUUID():'uid-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+    localStorage.setItem('locorunner_uid',id);
+  }
+  return id;
+}
+
+// ---- SEGUIMIENTO DE USO MENSUAL (consultas al entrenador IA) ----
+// El proxy devuelve el conteo actualizado en cada respuesta correcta,
+// vía las cabeceras X-Usage-Count / X-Usage-Limit. Lo guardamos en
+// localStorage para poder mostrarlo sin hacer una llamada extra.
+function trackUsage(res){
+  try{
+    const c=res.headers.get('X-Usage-Count');
+    const l=res.headers.get('X-Usage-Limit');
+    if(c&&l){
+      localStorage.setItem('locorunner_usage',JSON.stringify({count:+c,limit:+l}));
+      renderUsageBar();
+    }
+  }catch(e){}
+}
+function getUsage(){
+  try{ return JSON.parse(localStorage.getItem('locorunner_usage')||'null'); }
+  catch(e){ return null; }
+}
+// Barra discreta dentro del chat (se actualiza sin recargar toda la vista)
+function renderUsageBar(){
+  const wrap=document.getElementById('usageBarWrap');
+  if(!wrap) return;
+  const u=getUsage();
+  if(!u){ wrap.innerHTML=''; return; }
+  const pct=Math.min(100,Math.round(u.count/u.limit*100));
+  const color=pct>=100?'var(--acc3)':pct>=80?'var(--acc2)':'var(--acc)';
+  const restantes=Math.max(0,u.limit-u.count);
+  wrap.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 2px 8px;font-size:10px;color:var(--text3)">
+      <div style="flex:1;height:4px;background:var(--bg4);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;transition:width .3s"></div>
+      </div>
+      <span style="white-space:nowrap;font-family:'JetBrains Mono',monospace">${restantes}/${u.limit} consultas</span>
+    </div>`;
+}
+// Panel detallado en Mi Perfil / Ajustes
+function renderUsagePanel(){
+  const u=getUsage();
+  if(!u){
+    return `
+    <div class="panel" style="border-color:var(--acc)25">
+      <div class="panel-title">Entrenador IA</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc);flex-shrink:0"></div>
+        <div>
+          <div style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">Operativo</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">Modelo Claude Sonnet · escríbele algo al coach para ver tu consumo mensual</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  const pct=Math.min(100,Math.round(u.count/u.limit*100));
+  const agotado=u.count>=u.limit;
+  const color=agotado?'var(--acc3)':pct>=80?'var(--acc2)':'var(--acc)';
+  const restantes=Math.max(0,u.limit-u.count);
+  return `
+  <div class="panel" style="border-color:${color}25">
+    <div class="panel-title">Entrenador IA</div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:.8rem">
+      <div style="width:9px;height:9px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color};flex-shrink:0"></div>
+      <div>
+        <div style="font-size:13px;color:${color};font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">${agotado?'Límite alcanzado':'Operativo'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Modelo Claude Sonnet · plan beta</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px">
+      <span>Consultas usadas este mes</span>
+      <span style="font-family:'JetBrains Mono',monospace">${u.count} / ${u.limit}</span>
+    </div>
+    <div style="height:6px;background:var(--bg4);border-radius:99px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:${color};border-radius:99px;transition:width .3s"></div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px">${agotado?'Se renueva el día 1 del próximo mes.':`Te quedan ${restantes} consultas este mes.`}</div>
+  </div>`;
 }
 function setApiKey(k){S.apiKey=k.trim();save();}
 
@@ -4012,6 +4106,7 @@ function renderChat(el){
     <div class="chat-msgs" id="cmsgs"></div>
     <!-- Image preview bar -->
     <div id="imgPreviewBar" style="display:none;gap:8px;padding:8px 10px 0;align-items:center;background:var(--bg2);border-left:1px solid var(--border);border-right:1px solid var(--border);flex-wrap:wrap"></div>
+    <div id="usageBarWrap"></div>
     <div class="chat-bar">
       <div class="chat-bar-top">
         <button class="btn btn-ghost" onclick="document.getElementById('fileInput').click()" style="font-size:11px">
@@ -4043,6 +4138,7 @@ function renderChat(el){
     </div>
   </div>`;
 
+  renderUsageBar();
   const msgs=document.getElementById('cmsgs');
   if(S.chatHistory.length===0){
     aiMsg(`¡Hola! Soy Locorunner, tu entrenador IA con búsqueda científica en tiempo real.\n\n📏 **${S.athlete.altura}cm** · ${S.athlete.peso}kg · ${S.athlete.edad}a · FCmax ${S.athlete.fcmax}ppm\n🎯 Objetivo: **${S.athlete.objetivo}** · ${S.athlete.objetivo_fecha}\n👟 ${S.athlete.zapatillas}\n\n${!hasKey?'⚠️ **Necesitas configurar tu API key** (campo de arriba) para activar el chat. Pulsa "¿Cómo obtenerla?" para ver los pasos.\n\n':''}Puedo ayudarte a:\n• **🔬 Buscar evidencia científica actual** — consulto PubMed y BJSM en tiempo real\n• **📷 Analizar imágenes del Coros** — extraigo y comparo todos los datos\n• **🥗 Plan de nutrición** — calculado para tu peso con geles y tiempos exactos\n• **❤️ Análisis de FC y zonas** — correlación con terreno y altimetría\n• **📊 Comparar entrenamientos** — cualquier métrica\n\n¿Por dónde empezamos?`);
@@ -5149,7 +5245,12 @@ Responde en español, de forma clara y accesible (no excesivamente técnica). M�
       headers:apiHeaders(apiKey),
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})
     });
+    trackUsage(res);
     const data=await res.json();
+    if(data.error){
+      body.innerHTML=`<div style="color:var(--acc3);font-size:12px">${data.error.type==='rate_limit_error'?'🚦 '+data.error.message:'Error: '+data.error.message}</div>`;
+      return;
+    }
     const reply=data.content?.find(b=>b.type==='text')?.text||'No se pudo obtener el resumen.';
 
     // Format the response
@@ -5226,10 +5327,14 @@ REGLAS CRÍTICAS:
     headers: apiHeaders(apiKey),
     body: JSON.stringify({model:'claude-sonnet-4-5', max_tokens:900, messages:[{role:'user',content:prompt}]})
   })
-  .then(r=>r.json())
+  .then(r=>{ trackUsage(r); return r.json(); })
   .then(data=>{
     typing?.remove();
     hideCoachWorking();
+    if(data.error){
+      aiMsg(data.error.type==='rate_limit_error'?`🚦 **${data.error.message}**`:`❌ Error API: ${data.error.message}`);
+      return;
+    }
     const reply = data?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
     if(reply){
       S.chatHistory.push({role:'assistant', content:reply});
@@ -5543,12 +5648,14 @@ async function sendMsg(){
       headers:apiHeaders(apiKey),
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1800,system:sys,messages})
     });
+    trackUsage(res);
     const data=await res.json();
     if(data.error){
       typing?.remove();
       hideCoachWorking();
       const errMsg=data.error.type==='authentication_error'?'❌ **API key inválida.**'
         :data.error.type==='insufficient_quota'?'❌ **Sin crédito en Anthropic.**'
+        :data.error.type==='rate_limit_error'?`🚦 **${data.error.message}**`
         :`❌ Error API (${data.error.type}): ${data.error.message}`;
       aiMsg(errMsg); btn.disabled=false; btn.innerHTML=sendIcon(); return;
     }
@@ -6015,7 +6122,14 @@ ${week.map(w=>`### ${w.day.toUpperCase()} ${fmtD(w.date)}
       headers:apiHeaders(apiKey),
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2500,system:sys,messages:msgs})
     });
+    trackUsage(res);
     const data=await res.json();
+    if(data.error){
+      typing?.remove();
+      hideCoachWorking();
+      aiMsg(data.error.type==='rate_limit_error'?`🚦 **${data.error.message}**`:`❌ Error API (${data.error.type}): ${data.error.message}`);
+      return;
+    }
     const reply=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n\n')||'Sin respuesta.';
     typing?.remove();
     hideCoachWorking();
@@ -6330,7 +6444,14 @@ Usa este formato:
       headers:apiHeaders(apiKey),
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2500,system:sys,messages:messagesForPlan})
     });
+    trackUsage(res);
     const data=await res.json();
+    if(data.error){
+      typing?.remove();
+      hideCoachWorking();
+      aiMsg(data.error.type==='rate_limit_error'?`🚦 **${data.error.message}**`:`❌ Error API (${data.error.type}): ${data.error.message}`);
+      return;
+    }
     const reply=data.content?.find(b=>b.type==='text')?.text||'Sin respuesta.';
     typing?.remove();
     hideCoachWorking();
@@ -6684,16 +6805,7 @@ function renderPerfil(el){
   </div>
 
   <!-- ESTADO DEL ENTRENADOR IA -->
-  <div class="panel" style="border-color:var(--acc)25">
-    <div class="panel-title">Entrenador IA</div>
-    <div style="display:flex;gap:12px;align-items:center">
-      <div style="width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc);flex-shrink:0"></div>
-      <div>
-        <div style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">Operativo</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">Modelo Claude Sonnet · chat y planes activos</div>
-      </div>
-    </div>
-  </div>`;
+  ${renderUsagePanel()}`;
 }
 function pf(lbl,key,val,type){return`<div><div style="font-size:10px;color:var(--text2);margin-bottom:4px">${lbl}</div><input type="${type}" id="f-${key}" value="${val}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none"></div>`;}
 function setGymMode(mode){
