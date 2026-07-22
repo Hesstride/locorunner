@@ -63,7 +63,7 @@
   --purple:   #a78bfa;
   --text:     #eef0f8;
   --text2:    #8890b0;
-  --text3:    #4a5070;
+  --text3:    #7d84a8;
   --r:        10px;
   --r2:       6px;
   /* metric colors */
@@ -88,7 +88,7 @@
   /* El magenta de relleno NO cambia entre temas; solo se oscurece el de texto */
   --acc:#ff3d8b;--acc-t:#c41f60;--acc-bg:#fff0f6;--on-acc:#ffffff;
   --acc2:#0284c7;--acc3:#c2410c;--acc4:#a16207;
-  --purple:#7c3aed;--text:#111827;--text2:#4b5680;--text3:#8892b0;
+  --purple:#7c3aed;--text:#111827;--text2:#4b5680;--text3:#5f6690;
   --c-cad:#7c3aed;--c-ts:#0d9488;--c-zan:#a16207;
   --c-ritmo:#0284c7;--c-fc:#c2410c;--c-hrv:#4338ca;--c-vo2:#047857;
   --tt-carrera:#dc2626;--tt-calidad:#c2410c;--tt-rodaje:#15803d;
@@ -575,7 +575,7 @@ function gridColor(){
   return document.documentElement.getAttribute('data-theme')==='light'?'#e0e5f0':'#1e2235';
 }
 function tickColor(){
-  return document.documentElement.getAttribute('data-theme')==='light'?'#8892b0':'#4a5070';
+  return document.documentElement.getAttribute('data-theme')==='light'?'#5f6690':'#7d84a8';
 }
 function fmtT(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return h>0?h+'h'+m.toString().padStart(2,'0')+'m':m+':'+(s<10?'0':'')+s;}
 function fmtD(str){const d=new Date(str+'T00:00:00');return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});}
@@ -3022,7 +3022,7 @@ function renderFC(el){
     new Chart(document.getElementById('cFCRitmo'),{
       type:'scatter',
       data:{datasets:[{data:fcData.map(e=>({x:e.fc,y:e.ritmo,label:fmtD(e.fecha)})),backgroundColor:fcData.map((_,i,a)=>`hsl(${200+i/a.length*80},70%,60%)`),pointRadius:7}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw.label}: FC ${c.raw.x} · ${fmt(c.raw.y)}/km`}}},scales:{x:{min:fcMin,max:fcMax,title:{display:true,text:'FC media (ppm)',color:'#4a5070',font:{size:10}},ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}},y:{reverse:true,min:ritmoMin,max:ritmoMax,title:{display:true,text:'Ritmo min/km (↑ = más rápido)',color:'#4a5070',font:{size:10}},ticks:{color:'#4a5070',font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}}}}
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw.label}: FC ${c.raw.x} · ${fmt(c.raw.y)}/km`}}},scales:{x:{min:fcMin,max:fcMax,title:{display:true,text:'FC media (ppm)',color:tickColor(),font:{size:10}},ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}},y:{reverse:true,min:ritmoMin,max:ritmoMax,title:{display:true,text:'Ritmo min/km (↑ = más rápido)',color:tickColor(),font:{size:10}},ticks:{color:tickColor(),font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}}}}
     });
   },50);
 }
@@ -3110,22 +3110,22 @@ function renderBio(el){
   setTimeout(()=>{
     const filt=E.filter(e=>e.cad);
     const lb=filt.map(e=>fmtD(e.fecha));
-    const co={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}},y:{ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}}}};
+    const co={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}},y:{ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}}}};
 
     const cadVals=filt.map(e=>e.cad);
     const cadYMin=Math.floor(Math.min(...cadVals,CI.min)/5)*5-5;
     const cadYMax=Math.ceil(Math.max(...cadVals,CI.max)/5)*5+5;
-    new Chart(document.getElementById('bCad'),{type:'line',data:{labels:lb,datasets:[{data:cadVals,borderColor:'#a78bfa',backgroundColor:'#a78bfa20',pointBackgroundColor:filt.map(e=>e.cad>=CI.min?'#a78bfa':'#ff8a3d'),pointRadius:5,borderWidth:2,tension:.3,fill:true}]},options:{...co,scales:{...co.scales,y:{min:cadYMin,max:cadYMax,ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}}}}});
+    new Chart(document.getElementById('bCad'),{type:'line',data:{labels:lb,datasets:[{data:cadVals,borderColor:'#a78bfa',backgroundColor:'#a78bfa20',pointBackgroundColor:filt.map(e=>e.cad>=CI.min?'#a78bfa':'#ff8a3d'),pointRadius:5,borderWidth:2,tension:.3,fill:true}]},options:{...co,scales:{...co.scales,y:{min:cadYMin,max:cadYMax,ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}}}}});
 
     const tsVals=filt.map(e=>e.ts||null).filter(Boolean);
     const tsYMin=tsVals.length?Math.floor(Math.min(...tsVals)/5)*5-10:220;
     const tsYMax=tsVals.length?Math.ceil(Math.max(...tsVals)/5)*5+10:300;
-    new Chart(document.getElementById('bTS'),{type:'line',data:{labels:lb,datasets:[{data:filt.map(e=>e.ts||null),borderColor:'#2dd4bf',backgroundColor:'#ff8a3d20',pointBackgroundColor:'#ff8a3d',pointRadius:5,borderWidth:2,tension:.3,fill:true,spanGaps:true}]},options:{...co,scales:{...co.scales,y:{reverse:true,min:tsYMin,max:tsYMax,ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}}}}});
+    new Chart(document.getElementById('bTS'),{type:'line',data:{labels:lb,datasets:[{data:filt.map(e=>e.ts||null),borderColor:'#2dd4bf',backgroundColor:'#ff8a3d20',pointBackgroundColor:'#ff8a3d',pointRadius:5,borderWidth:2,tension:.3,fill:true,spanGaps:true}]},options:{...co,scales:{...co.scales,y:{reverse:true,min:tsYMin,max:tsYMax,ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}}}}});
 
     const zanVals=filt.map(e=>e.zan||null).filter(Boolean);
     const zanYMin=zanVals.length?Math.floor(Math.min(...zanVals)/5)*5-5:85;
     const zanYMax=zanVals.length?Math.ceil(Math.max(...zanVals)/5)*5+5:140;
-    new Chart(document.getElementById('bZan'),{type:'bar',data:{labels:lb,datasets:[{data:filt.map(e=>e.zan||null),backgroundColor:'#ffc53160',borderColor:'#00e0a4',borderWidth:1}]},options:{...co,scales:{...co.scales,y:{min:zanYMin,max:zanYMax,ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}}}}});
+    new Chart(document.getElementById('bZan'),{type:'bar',data:{labels:lb,datasets:[{data:filt.map(e=>e.zan||null),backgroundColor:'#ffc53160',borderColor:'#00e0a4',borderWidth:1}]},options:{...co,scales:{...co.scales,y:{min:zanYMin,max:zanYMax,ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}}}}});
 
     if(zam&&zam.parciales){
       const kls=zam.parciales.map((_,i)=>'K'+(i+1));
@@ -3135,7 +3135,7 @@ function renderBio(el){
           {type:'bar',label:'Ritmo',data:zam.parciales,backgroundColor:zam.parciales.map((_,i)=>i>=14?'#ff8a3d80':'#45c4ff40'),borderColor:zam.parciales.map((_,i)=>i>=14?'#ff8a3d':'#45c4ff'),borderWidth:1,yAxisID:'y'},
           {type:'line',label:'Altimetría',data:zam.altimetria,borderColor:'#ffc53180',backgroundColor:'#ffc53115',pointRadius:0,borderWidth:2,tension:.4,fill:true,yAxisID:'y2'}
         ]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8890b0',font:{size:10}}}},scales:{x:{ticks:{color:'#4a5070',font:{size:10}},grid:{display:false}},y:{reverse:true,...(axisRange(zam.parciales,0.3,0.1)||{}),position:'left',ticks:{color:'#4a5070',font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}},y2:{...(axisRange(zam.altimetria,10,5)||{}),position:'right',title:{display:true,text:'Alt (m)',color:'#ffc531',font:{size:9}},ticks:{color:'#4a5070',font:{size:9}},grid:{display:false}}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8890b0',font:{size:10}}}},scales:{x:{ticks:{color:tickColor(),font:{size:10}},grid:{display:false}},y:{reverse:true,...(axisRange(zam.parciales,0.3,0.1)||{}),position:'left',ticks:{color:tickColor(),font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}},y2:{...(axisRange(zam.altimetria,10,5)||{}),position:'right',title:{display:true,text:'Alt (m)',color:'#ffc531',font:{size:9}},ticks:{color:tickColor(),font:{size:9}},grid:{display:false}}}}
       });
     }
     if(tid&&tid.parciales){
@@ -3146,7 +3146,7 @@ function renderBio(el){
           {type:'bar',label:'Ritmo',data:tid.parciales,backgroundColor:'#45c4ff40',borderColor:'#00e0a4',borderWidth:1,yAxisID:'y'},
           {type:'line',label:'Altimetría',data:tid.altimetria,borderColor:'#ffc53180',backgroundColor:'#ffc53110',pointRadius:0,borderWidth:2,tension:.4,fill:true,yAxisID:'y2'}
         ]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8890b0',font:{size:10}}}},scales:{x:{ticks:{color:'#4a5070',font:{size:10}},grid:{display:false}},y:{reverse:true,...(axisRange(tid.parciales,0.3,0.1)||{}),position:'left',ticks:{color:'#4a5070',font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}},y2:{...(axisRange(tid.altimetria,10,5)||{}),position:'right',ticks:{color:'#4a5070',font:{size:9}},grid:{display:false}}}}
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8890b0',font:{size:10}}}},scales:{x:{ticks:{color:tickColor(),font:{size:10}},grid:{display:false}},y:{reverse:true,...(axisRange(tid.parciales,0.3,0.1)||{}),position:'left',ticks:{color:tickColor(),font:{size:10},callback:v=>fmt(v)},grid:{color:'#1e2235'}},y2:{...(axisRange(tid.altimetria,10,5)||{}),position:'right',ticks:{color:tickColor(),font:{size:9}},grid:{display:false}}}}
       });
     }
 
@@ -3217,7 +3217,7 @@ function renderScience(el){
       const vals=vo.map(p=>p.val);
       const yMin=Math.floor(Math.min(...vals))-2;
       const yMax=Math.ceil(Math.max(...vals))+2;
-      new Chart(cv,{type:'line',data:{labels:vo.map(p=>fmtD(p.fecha)),datasets:[{data:vals,borderColor:accentColor(),backgroundColor:accentColor()+'20',pointBackgroundColor:vo.map(p=>p.esEst?'transparent':accentColor()),pointBorderColor:accentColor(),pointBorderWidth:2,pointRadius:4,borderWidth:2,tension:.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} ml/kg/min${vo[c.dataIndex].esEst?' (estimado con tu FC y ritmo)':''}`}}},scales:{x:{ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}},y:{min:yMin,max:yMax,ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}}}}});
+      new Chart(cv,{type:'line',data:{labels:vo.map(p=>fmtD(p.fecha)),datasets:[{data:vals,borderColor:accentColor(),backgroundColor:accentColor()+'20',pointBackgroundColor:vo.map(p=>p.esEst?'transparent':accentColor()),pointBorderColor:accentColor(),pointBorderWidth:2,pointRadius:4,borderWidth:2,tension:.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} ml/kg/min${vo[c.dataIndex].esEst?' (estimado con tu FC y ritmo)':''}`}}},scales:{x:{ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}},y:{min:yMin,max:yMax,ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}}}}});
     }
   },50);
 }
@@ -3442,7 +3442,7 @@ function renderList(el){
     const E2=S.entrenamientos;
     if(!E2.length)return;
     const lbs=E2.map(e=>fmtD(e.fecha));
-    const base=(yOpts)=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#4a5070',font:{size:10}},grid:{color:'#1e2235'}},y:{...yOpts,ticks:{color:'#4a5070',font:{size:10},...(yOpts.ticks||{})},grid:{color:'#1e2235'}}}});
+    const base=(yOpts)=>({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:tickColor(),font:{size:10}},grid:{color:'#1e2235'}},y:{...yOpts,ticks:{color:tickColor(),font:{size:10},...(yOpts.ticks||{})},grid:{color:'#1e2235'}}}});
 
     const cvR=document.getElementById('cRitmo');
     if(cvR){
