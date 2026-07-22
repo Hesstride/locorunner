@@ -3933,7 +3933,9 @@ function genCmpText(a,b){
 let pImg=null, pImgData=null;
 
 // API key stored only in memory + localStorage (never leaves device)
-function getApiKey(){return S.apiKey||'';}
+// La API key ya no la gestiona el usuario — vive en el proxy de Vercel.
+// Devolvemos siempre true para que la UI se comporte como "conectada".
+function getApiKey(){return true;}
 // URL de tu proxy en Vercel. Cámbiala por la tuya tras desplegar
 // (Vercel te la da como https://TU-PROYECTO.vercel.app).
 const STRIDE_PROXY_URL='https://stride-proxy-navy.vercel.app/api/anthropic';
@@ -3942,7 +3944,9 @@ function apiUrl(){
   return STRIDE_PROXY_URL;
 }
 function apiHeaders(key){
-  return {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'};
+  // La API key ya vive en el servidor (variable de entorno del proxy).
+  // No la mandamos desde el cliente — el proxy la añade él solo.
+  return {'Content-Type':'application/json','anthropic-version':'2023-06-01'};
 }
 function setApiKey(k){S.apiKey=k.trim();save();}
 
@@ -6679,22 +6683,17 @@ function renderPerfil(el){
     </div>
   </div>
 
-  <!-- CONEXIÓN CON EL ENTRENADOR IA (antes vivía en la cabecera del chat) -->
-  ${(()=>{const hasKey=!!getApiKey();return`
-  <div class="panel" style="border-color:${hasKey?'var(--acc)25':'var(--acc3)40'}">
-    <div class="panel-title">Conexión con ${coachNombre()}</div>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div style="width:9px;height:9px;border-radius:50%;background:${hasKey?'var(--acc)':'var(--acc3)'};box-shadow:0 0 6px ${hasKey?'var(--acc)':'var(--acc3)'};flex-shrink:0"></div>
-      <div style="flex:1;min-width:200px">
-        <div style="font-size:13px;color:${hasKey?'var(--acc)':'var(--acc3)'};font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">${hasKey?'API conectada':'API desconectada'}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">${hasKey?'Modelo Claude Sonnet · el chat y los planes están operativos':'Sin clave, el entrenador no puede responder ni generar planes'}</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button onclick="showApiKeyPanel()" style="background:${hasKey?'var(--bg3)':'var(--acc)'};border:${hasKey?'1px solid var(--border)':'none'};border-radius:6px;padding:7px 14px;color:${hasKey?'var(--text2)':'#000'};cursor:pointer;font-size:12px;font-family:'Inter'">${hasKey?'Cambiar clave':'Conectar API'}</button>
-        <button onclick="showApiInfo()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 14px;color:var(--text2);cursor:pointer;font-size:12px;font-family:'Inter'">¿Cómo obtenerla?</button>
+  <!-- ESTADO DEL ENTRENADOR IA -->
+  <div class="panel" style="border-color:var(--acc)25">
+    <div class="panel-title">Entrenador IA</div>
+    <div style="display:flex;gap:12px;align-items:center">
+      <div style="width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc);flex-shrink:0"></div>
+      <div>
+        <div style="font-size:13px;color:var(--acc);font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">Operativo</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">Modelo Claude Sonnet · chat y planes activos</div>
       </div>
     </div>
-  </div>`;})()}`;
+  </div>`;
 }
 function pf(lbl,key,val,type){return`<div><div style="font-size:10px;color:var(--text2);margin-bottom:4px">${lbl}</div><input type="${type}" id="f-${key}" value="${val}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none"></div>`;}
 function setGymMode(mode){
