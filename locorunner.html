@@ -3950,7 +3950,12 @@ function apiUrl(){
 function apiHeaders(key){
   // La API key ya vive en el servidor (variable de entorno del proxy).
   // No la mandamos desde el cliente — el proxy la añade él solo.
-  return {'Content-Type':'application/json','anthropic-version':'2023-06-01','x-user-id':getUserId()};
+  const headers = {'Content-Type':'application/json','anthropic-version':'2023-06-01','x-user-id':getUserId()};
+  // Si el modo desarrollador está activo en este navegador, mandamos el
+  // código de desarrollador al proxy para que no cuente esta consulta
+  // contra el límite mensual (ver DEV_OVERRIDE_CODE más arriba).
+  if(isDevMode()) headers['x-dev-code'] = DEV_OVERRIDE_CODE;
+  return headers;
 }
 
 // Identificador anónimo por dispositivo — el proxy lo usa para contar
@@ -3965,6 +3970,43 @@ function getUserId(){
     localStorage.setItem('locorunner_uid',id);
   }
   return id;
+}
+
+// Código de desarrollador para saltar la validación de deviceId al importar
+// en otro dispositivo/navegador (uso exclusivo de pruebas internas).
+// ⚠️ Este código es visible en el código fuente de la página — no es una
+// medida de seguridad real, solo una comodidad para pruebas. La protección
+// definitiva llegará con el registro por email (Fase 2).
+// Cámbialo de vez en cuando si quieres, editando esta línea.
+const DEV_OVERRIDE_CODE = 'locorunner-dev-2026';
+
+// ---- MODO DESARROLLADOR (activado por URL, persiste en este navegador) ----
+// Visita la app con ?dev=locorunner-dev-2026 para activarlo, o con
+// ?dev=off para desactivarlo. Se guarda en localStorage de este navegador
+// hasta que lo desactives — no hace falta repetir el parámetro cada vez.
+// Efectos: la barra/panel de consultas deja de mostrar el límite, y las
+// importaciones de otro dispositivo no piden el código de desarrollador.
+// ⚠️ Esto solo afecta a lo que se MUESTRA en este navegador. El conteo
+// real de consultas ocurre en el proxy de Vercel — este modo no lo toca.
+function checkDevModeFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  if(!params.has('dev')) return;
+  const code = params.get('dev');
+  if(code === DEV_OVERRIDE_CODE){
+    localStorage.setItem('locorunner_dev_mode','1');
+    showToast('🔓 Modo desarrollador activado en este navegador','var(--acc2)');
+  } else if(code === 'off'){
+    localStorage.removeItem('locorunner_dev_mode');
+    showToast('Modo desarrollador desactivado','var(--text2)');
+  }
+  // Quitar el parámetro de la URL para que el código no quede visible
+  // en la barra de direcciones ni guardado en el historial del navegador.
+  params.delete('dev');
+  const clean = window.location.pathname + (params.toString() ? '?'+params.toString() : '');
+  window.history.replaceState({}, '', clean);
+}
+function isDevMode(){
+  return localStorage.getItem('locorunner_dev_mode') === '1';
 }
 
 // ---- SEGUIMIENTO DE USO MENSUAL (consultas al entrenador IA) ----
@@ -3989,6 +4031,13 @@ function getUsage(){
 function renderUsageBar(){
   const wrap=document.getElementById('usageBarWrap');
   if(!wrap) return;
+  if(isDevMode()){
+    wrap.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px;padding:6px 2px 8px;font-size:10px;color:var(--acc2)">
+      🔓 <span>Modo desarrollador — sin límite mostrado</span>
+    </div>`;
+    return;
+  }
   const u=getUsage();
   if(!u){ wrap.innerHTML=''; return; }
   const pct=Math.min(100,Math.round(u.count/u.limit*100));
@@ -4004,6 +4053,19 @@ function renderUsageBar(){
 }
 // Panel detallado en Mi Perfil / Ajustes
 function renderUsagePanel(){
+  if(isDevMode()){
+    return `
+    <div class="panel" style="border-color:var(--acc2)25">
+      <div class="panel-title">Entrenador IA</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="width:9px;height:9px;border-radius:50%;background:var(--acc2);box-shadow:0 0 6px var(--acc2);flex-shrink:0"></div>
+        <div>
+          <div style="font-size:13px;color:var(--acc2);font-family:'JetBrains Mono';letter-spacing:1px;text-transform:uppercase">Modo desarrollador</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">No se muestra límite de consultas en este navegador.</div>
+        </div>
+      </div>
+    </div>`;
+  }
   const u=getUsage();
   if(!u){
     return `
@@ -7375,6 +7437,7 @@ function exportData(){
     _stride_version: 2,
     _exported: new Date().toISOString(),
     _description: 'Locorunner — Copia de seguridad completa (credenciales excluidas por seguridad)',
+    deviceId: getUserId(),
     data: safeData
   };
 
@@ -7491,6 +7554,7 @@ function initTheme(){
   if(btn) btn.textContent=saved==='light'?'☀️':'🌙';
 }
 initTheme();
+checkDevModeFromUrl();
 go('dash');
 updateTopbar();
 updateStravaStatus();
@@ -7509,6 +7573,21 @@ document.getElementById('importInput').onchange = function(e){
       if(!data.athlete||!data.entrenamientos){
         showToast('❌ Archivo no válido. Usa un backup de Locorunner.','var(--acc3)');return;
       }
+
+      // Comprobación de dispositivo: un backup exportado desde este mismo
+      // navegador se puede reimportar libremente. Si viene de otro
+      // dispositivo/navegador (p.ej. una pestaña de incógnito distinta),
+      // se bloquea para evitar reiniciar el contador de consultas de la IA.
+      const currentDeviceId = getUserId();
+      if(parsed.deviceId && parsed.deviceId !== currentDeviceId && !isDevMode()){
+        const code = prompt('⚠️ Este backup pertenece a otro dispositivo.\n\nPor seguridad, no se puede importar aquí — esto evita reiniciar el límite de consultas de la IA abriendo el backup en otro navegador.\n\nSi eres el desarrollador y necesitas hacerlo para pruebas, introduce el código de desarrollador:');
+        if(code !== DEV_OVERRIDE_CODE){
+          showToast('❌ Este backup pertenece a otro dispositivo. Importación bloqueada.','var(--acc3)');
+          return;
+        }
+        showToast('🔓 Código de desarrollador aceptado — importando de todas formas','var(--acc2)');
+      }
+
       if(!confirm(`¿Importar backup del ${parsed._exported ? new Date(parsed._exported).toLocaleDateString('es-ES') : 'archivo'}?\n\n${data.entrenamientos.length} entrenamientos · ${(data.eventos||[]).length} eventos · ${(data.planes||[]).length} planes\n\nEsto reemplazará todos los datos actuales.`))return;
 
       // Merge all fields carefully
