@@ -438,7 +438,7 @@ function coachTitulo(){var g=(S.coach&&S.coach.genero)||'masculino';return (g===
 function defState(){
   return {
     isNewUser: true,
-    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},
+    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},
     coach:{genero:'masculino',estilo:'exigente'},
     equipacion:{
       reloj:{marca:'Coros',modelo:'Pace 3'},
@@ -490,6 +490,7 @@ function load(){
         if(d.athlete.nivel===undefined)d.athlete.nivel='';
         if(d.athlete.volumenSemanal===undefined)d.athlete.volumenSemanal=0;
         if(!Array.isArray(d.athlete.diasDisponibles))d.athlete.diasDisponibles=[];
+        if(!Array.isArray(d.athlete.entrenosFijos))d.athlete.entrenosFijos=[];
         if(d.athlete.objetivo_tipo===undefined)d.athlete.objetivo_tipo='';
       }
       if(!d.equipacion)d.equipacion={reloj:{marca:'',modelo:''},zapatillas:[],defaultShoe:null};
@@ -510,7 +511,7 @@ function load(){
       return d;
     }
   }catch(e){}
-  return {isNewUser:true,athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},coach:{genero:'masculino',estilo:'exigente'},equipacion:{reloj:{marca:'',modelo:''},zapatillas:[]},entrenamientos:[],chatHistory:[],planes:[],eventos:[],kmObjetivoAnual:1000,prs:{},strava:{clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}};
+  return {isNewUser:true,athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},coach:{genero:'masculino',estilo:'exigente'},equipacion:{reloj:{marca:'',modelo:''},zapatillas:[]},entrenamientos:[],chatHistory:[],planes:[],eventos:[],kmObjetivoAnual:1000,prs:{},strava:{clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}};
 }
 function save(){
   try{
@@ -979,7 +980,7 @@ function saveSetup(){
 let onb = null;
 const ONB_DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const ONB_DAYS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','objetivo','salud','coach','resumen'];
+const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','entrenosfijos','objetivo','salud','coach','resumen'];
 
 function estimateFcmax(rango){
   const mid={'18-25':21,'26-35':30,'36-45':40,'46-55':50,'56-65':60,'65+':68}[rango]||35;
@@ -1042,6 +1043,7 @@ function onbDefaults(){
     fcmax:a.fcmax||'', fcreposo:a.fcreposo||'',
     nivel:a.nivel||'', volumenSemanal:(a.volumenSemanal!==undefined?a.volumenSemanal:''),
     diasDisponibles:Array.isArray(a.diasDisponibles)?[...a.diasDisponibles]:[],
+    entrenosFijos:Array.isArray(a.entrenosFijos)?a.entrenosFijos.map(x=>({...x})):[],
     objetivo_tipo:a.objetivo_tipo||'', objetivo:a.objetivo||'',
     objetivo_fecha:a.objetivo_fecha||'', objetivo_ritmo:a.objetivo_ritmo||'',
     lesiones:a.lesiones||'',
@@ -1099,6 +1101,27 @@ function onbRefreshDays(){
   if(cnt)cnt.textContent=onb.diasDisponibles.length;
   const all=document.getElementById('onbAllDays');
   if(all)all.textContent=onb.diasDisponibles.length===7?'Quitar todos':'Marcar todos';
+}
+function onbFijosListHTML(fijos){
+  if(!fijos.length) return `<div class="onb-note" style="margin:0">Aún no has añadido ningún día fijo.</div>`;
+  return fijos.map((f,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+      <span style="font-size:13px;color:var(--text)"><strong style="color:var(--acc2)">${ONB_DAYS_FULL[f.dia]}</strong> — ${f.nombre}</span>
+      <button onclick="onbRemoveFijo(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;line-height:1;padding:0 4px" title="Eliminar">×</button>
+    </div>`).join('');
+}
+function onbAddFijo(){
+  const diaSel=document.getElementById('onbFijoDia');
+  const nombreInp=document.getElementById('onbFijoNombre');
+  const nombre=(nombreInp&&nombreInp.value||'').trim();
+  if(!nombre){ if(nombreInp)nombreInp.focus(); return; }
+  onb.entrenosFijos=onb.entrenosFijos||[];
+  onb.entrenosFijos.push({dia:parseInt(diaSel.value), nombre});
+  onbRender();
+}
+function onbRemoveFijo(i){
+  onb.entrenosFijos.splice(i,1);
+  onbRender();
 }
 function onbBack(){ if(onb.step>0){onb.step--; onbRender();} }
 function onbNext(){
@@ -1247,6 +1270,29 @@ function onbStepBody(key){
       </div>`;
     }
 
+    case 'entrenosfijos':{
+      const fijos=d.entrenosFijos||[];
+      return `
+      <div class="onb-title">¿Tienes entrenos fijos con otras personas?</div>
+      <div class="onb-sub">Si sales un día fijo con tu equipo, tu grupeta o amigos, márcalo aquí. El entrenador respetará esos días y no te pondrá otra sesión encima. Es opcional.</div>
+      <div class="onb-grid2" style="align-items:end">
+        <div>
+          <div class="onb-label">Día</div>
+          <select class="onb-select" id="onbFijoDia">
+            ${ONB_DAYS_FULL.map((lbl,i)=>`<option value="${i}">${lbl}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div class="onb-label">¿Con quién / qué es?</div>
+          <input class="onb-input" id="onbFijoNombre" placeholder="Ej: Grupeta, Equipo, Amigos..." onkeydown="if(event.key==='Enter'){event.preventDefault();onbAddFijo();}">
+        </div>
+      </div>
+      <button class="onb-chip" style="margin-top:8px;display:inline-block" onclick="onbAddFijo()">+ Añadir día fijo</button>
+      <div id="onbFijosList" style="display:flex;flex-direction:column;gap:6px;margin-top:14px">
+        ${onbFijosListHTML(fijos)}
+      </div>`;
+    }
+
     case 'objetivo':{
       const tipos=[
         ['salud','Salud y forma','Correr para sentirme mejor, sin una carrera concreta.'],
@@ -1348,6 +1394,7 @@ function onbStepBody(key){
         <div class="onb-sumrow"><span>Nivel</span><span>${nivelTxt}</span></div>
         <div class="onb-sumrow"><span>Volumen actual</span><span>~${d.volumenSemanal||'—'} km/sem</span></div>
         <div class="onb-sumrow"><span>Días disponibles</span><span>${dias} (${d.diasDisponibles.length})</span></div>
+        <div class="onb-sumrow"><span>Entrenos fijos</span><span>${(d.entrenosFijos&&d.entrenosFijos.length)?d.entrenosFijos.map(f=>`${ONB_DAYS[f.dia]} (${f.nombre})`).join(', '):'Ninguno'}</span></div>
         <div class="onb-sumrow"><span>Objetivo</span><span>${tipos[d.objetivo_tipo]||'—'}${d.objetivo?' · '+d.objetivo:''}</span></div>
         <div class="onb-sumrow"><span>FC máx / reposo</span><span>${d.fcmax||estimateFcmax(d.edad)} / ${d.fcreposo||60} ppm</span></div>
         <div class="onb-sumrow" style="border-bottom:none"><span>Entrenador</span><span>${coachN} · ${estN}</span></div>
@@ -1366,6 +1413,7 @@ function onbFinish(){
   a.nivel=d.nivel;
   a.volumenSemanal=(d.volumenSemanal===''?0:parseFloat(d.volumenSemanal))||0;
   a.diasDisponibles=d.diasDisponibles.slice().sort((x,y)=>x-y);
+  a.entrenosFijos=(d.entrenosFijos||[]).map(f=>({...f}));
   a.objetivo_tipo=d.objetivo_tipo; a.objetivo=(d.objetivo||'').trim();
   a.objetivo_fecha=(d.objetivo_fecha||'').trim(); a.objetivo_ritmo=(d.objetivo_ritmo||'').trim();
   a.lesiones=(d.lesiones||'').trim();
@@ -5906,6 +5954,10 @@ function buildSys(){
     :(a.gymDays&&a.gymDays.length)?a.gymDays.map(d=>dayNames[d]).join(', '):'no configurados';
   const nivelTxt={principiante:'Principiante',intermedio:'Intermedio',avanzado:'Avanzado'}[a.nivel]||'no especificado';
   const dispStr=(Array.isArray(a.diasDisponibles)&&a.diasDisponibles.length)?a.diasDisponibles.slice().sort((x,y)=>x-y).map(d=>dayNames[d]).join(', ')+` (${a.diasDisponibles.length}/sem)`:'no especificados';
+  const entrenosFijos=Array.isArray(a.entrenosFijos)?a.entrenosFijos:[];
+  const fijosStr=entrenosFijos.length
+    ? entrenosFijos.slice().sort((x,y)=>x.dia-y.dia).map(f=>`${dayNames[f.dia]} (${f.nombre})`).join(', ')
+    : 'ninguno';
 
   const todayForSys = new Date(); todayForSys.setHours(0,0,0,0);
   const daysSinceLastStr = last ? (() => {
@@ -5939,6 +5991,7 @@ Nivel / experiencia: **${nivelTxt}**
 Volumen actual: **~${a.volumenSemanal||'?'} km/semana**
 Días disponibles para correr: **${dispStr}**
 Días de gimnasio fijos: **${gymDaysStr}**
+Entrenos fijos con equipo/grupeta/amigos (NO tocar, ya ocurren): **${fijosStr}**
 
 Cadencia ideal para ${a.altura}cm: **${CI.min}–${CI.max} p/min** (óptimo ${CI.opt})
 Zonas FC: Z1<${z[0].max} | Z2 ${z[0].max}-${z[1].max} | Z3 ${z[1].max}-${z[2].max} | Z4 ${z[2].max}-${z[3].max} | Z5>${z[3].max}
@@ -6038,6 +6091,9 @@ Responde en 3-5 frases directas. Sin introducción, sin resumen. Solo la respues
 ━━━ PLANES ━━━
 Fase actual: ${phase}. Ritmos en rangos concretos (ej: 5:00-5:15/km). Sin listar los datos del perfil — el atleta los conoce. Directo al plan.
 Prescribe SOLO en los días disponibles del atleta (${dispStr}). Ajusta volumen e intensidad al nivel (${nivelTxt}) y progresa desde ~${a.volumenSemanal||'?'} km/sem con incrementos ≤10%/semana.
+
+⛔ ENTRENOS FIJOS CON EQUIPO/GRUPETA/AMIGOS: ${fijosStr}.
+${entrenosFijos.length?'Esos días YA tienen un entreno que ocurre pase lo que pase — no propongas otra sesión distinta encima. Ese día, o bien no prescribes nada nuevo (asumes que el entreno fijo ya cubre la sesión), o como mucho ajustas su intensidad/rol dentro del plan (ej: "hoy en la grupeta, mételo como tirada suave" o "aprovecha las series del equipo del martes como tu sesión de calidad"). Cuenta ese entreno en el volumen semanal total. Nunca lo dupliques ni lo ignores.':'El atleta no tiene entrenos fijos con otros — ignora esta sección.'}
 
 ━━━ GIMNASIO ━━━
 Modo: ${gymMode==='none'?'NO INCLUIR':gymMode==='fixed'?`días fijos: ${gymDaysStr}`:'el coach decide, 2-3 sesiones/semana'}.
@@ -6815,6 +6871,20 @@ function renderPerfil(el){
         </div>
       </div>`:''}
     </div>
+    <div style="margin-top:1rem">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:8px;letter-spacing:.5px">Entrenos fijos con equipo, grupeta o amigos</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Estos días no se tocan al generar planes — el coach los da por hechos.</div>
+      <div class="grid2" style="margin-bottom:8px">
+        <select id="perfilFijoDia" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none">
+          ${['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map((lbl,i)=>`<option value="${i}">${lbl}</option>`).join('')}
+        </select>
+        <input id="perfilFijoNombre" placeholder="Ej: Grupeta, Equipo, Amigos..." style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none" onkeydown="if(event.key==='Enter'){event.preventDefault();addEntrenoFijo();}">
+      </div>
+      <button class="btn btn-ghost" style="margin-bottom:10px" onclick="addEntrenoFijo()">+ Añadir día fijo</button>
+      <div style="display:flex;flex-direction:column;gap:6px" id="entrenosFijosList">
+        ${entrenosFijosListHTML()}
+      </div>
+    </div>
     <div style="margin-top:.75rem">
       <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Historial lesiones</div>
       <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;resize:vertical;outline:none;min-height:56px" id="f-lesiones">${a.lesiones}</textarea>
@@ -6914,6 +6984,32 @@ function toggleGymDay(i, btn){
   btn.style.background=on?'var(--c-zan)20':'var(--bg3)';
   btn.style.color=on?'var(--c-zan)':'var(--text2)';
   save();
+}
+
+function entrenosFijosListHTML(){
+  const fijos=S.athlete.entrenosFijos||[];
+  const dayNames=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  if(!fijos.length) return `<div style="font-size:11px;color:var(--text3)">Aún no tienes ningún día fijo añadido.</div>`;
+  return fijos.map((f,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px">
+      <span style="font-size:12px;color:var(--text)"><strong style="color:var(--c-zan)">${dayNames[f.dia]}</strong> — ${f.nombre}</span>
+      <button onclick="removeEntrenoFijo(${i})" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0 4px" title="Eliminar">×</button>
+    </div>`).join('');
+}
+function addEntrenoFijo(){
+  const diaSel=document.getElementById('perfilFijoDia');
+  const nombreInp=document.getElementById('perfilFijoNombre');
+  const nombre=(nombreInp&&nombreInp.value||'').trim();
+  if(!nombre){ if(nombreInp)nombreInp.focus(); return; }
+  if(!S.athlete.entrenosFijos) S.athlete.entrenosFijos=[];
+  S.athlete.entrenosFijos.push({dia:parseInt(diaSel.value), nombre});
+  save();
+  go('perfil');
+}
+function removeEntrenoFijo(i){
+  S.athlete.entrenosFijos.splice(i,1);
+  save();
+  go('perfil');
 }
 
 function savePerfil(){
