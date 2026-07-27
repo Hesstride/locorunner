@@ -438,7 +438,7 @@ function coachTitulo(){var g=(S.coach&&S.coach.genero)||'masculino';return (g===
 function defState(){
   return {
     isNewUser: true,
-    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},
+    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach',objetivoUltimaConfirmacion:''},
     coach:{genero:'masculino',estilo:'exigente'},
     equipacion:{
       reloj:{marca:'Coros',modelo:'Pace 3'},
@@ -491,6 +491,7 @@ function load(){
         if(d.athlete.volumenSemanal===undefined)d.athlete.volumenSemanal=0;
         if(!Array.isArray(d.athlete.diasDisponibles))d.athlete.diasDisponibles=[];
         if(!Array.isArray(d.athlete.entrenosFijos))d.athlete.entrenosFijos=[];
+        if(!d.athlete.objetivoUltimaConfirmacion)d.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
         if(d.athlete.objetivo_tipo===undefined)d.athlete.objetivo_tipo='';
       }
       if(!d.equipacion)d.equipacion={reloj:{marca:'',modelo:''},zapatillas:[],defaultShoe:null};
@@ -511,7 +512,7 @@ function load(){
       return d;
     }
   }catch(e){}
-  return {isNewUser:true,athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach'},coach:{genero:'masculino',estilo:'exigente'},equipacion:{reloj:{marca:'',modelo:''},zapatillas:[]},entrenamientos:[],chatHistory:[],planes:[],eventos:[],kmObjetivoAnual:1000,prs:{},strava:{clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}};
+  return {isNewUser:true,athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach',objetivoUltimaConfirmacion:''},coach:{genero:'masculino',estilo:'exigente'},equipacion:{reloj:{marca:'',modelo:''},zapatillas:[]},entrenamientos:[],chatHistory:[],planes:[],eventos:[],kmObjetivoAnual:1000,prs:{},strava:{clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}};
 }
 function save(){
   try{
@@ -1416,6 +1417,7 @@ function onbFinish(){
   a.entrenosFijos=(d.entrenosFijos||[]).map(f=>({...f}));
   a.objetivo_tipo=d.objetivo_tipo; a.objetivo=(d.objetivo||'').trim();
   a.objetivo_fecha=(d.objetivo_fecha||'').trim(); a.objetivo_ritmo=(d.objetivo_ritmo||'').trim();
+  a.objetivoUltimaConfirmacion=new Date().toISOString();
   a.lesiones=(d.lesiones||'').trim();
   if(!S.equipacion)S.equipacion={reloj:{marca:'',modelo:''},zapatillas:[]};
   if(!S.equipacion.reloj)S.equipacion.reloj={marca:'',modelo:''};
@@ -1880,6 +1882,58 @@ function appConfirm(titulo, mensaje, okLabel, onOk, okColor){
   modal.querySelector('#appConfirmOk').addEventListener('click',()=>{modal.remove();onOk&&onOk();});
   modal.querySelector('#appConfirmCancel').addEventListener('click',()=>modal.remove());
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
+// ---- CHECK-IN PERIÓDICO DEL OBJETIVO (cada 15 días) ----
+// Se comprueba una vez al arrancar la app. Si han pasado 15+ días desde la
+// última confirmación (fijada en onboarding, al guardar el perfil, o al
+// confirmar aquí mismo), se muestra un pop-up preguntando si el objetivo
+// sigue siendo el mismo. La respuesta alimenta directamente a buildSys(),
+// que lee a.objetivo_tipo/objetivo/objetivo_fecha/objetivo_ritmo en cada
+// mensaje — no hace falta ninguna otra fontanería.
+function checkObjetivoRecordatorio(){
+  const a=S.athlete;
+  if(!a || S.isNewUser) return;
+  const last=a.objetivoUltimaConfirmacion;
+  const days = last ? Math.floor((Date.now()-new Date(last).getTime())/86400000) : Infinity;
+  if(days<15) return;
+  setTimeout(openObjetivoCheckin, 1200);
+}
+function openObjetivoCheckin(){
+  if(document.getElementById('objetivoCheckinModal')) return;
+  const a=S.athlete;
+  const tipos={salud:'Salud y forma',primera:'Tu primera carrera','5k':'Mejorar en 5K','10k':'Mejorar en 10K',media:'Media maratón',maraton:'Maratón'};
+  const objTxt=tipos[a.objetivo_tipo]||'sin definir';
+  const detalle=a.objetivo?` — ${a.objetivo}`:'';
+  const modal=document.createElement('div');
+  modal.id='objetivoCheckinModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:400px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--acc4);margin-bottom:.5rem">¿SIGUE EN PIE TU OBJETIVO?</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:1.1rem">Llevas un tiempo con este objetivo: <strong style="color:var(--text)">${objTxt}${detalle}</strong>. ¿Sigue siendo lo que quieres, o ha cambiado?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="confirmObjetivoVigente()" style="background:var(--acc4);color:#000;border:none;border-radius:6px;padding:10px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">SIGUE IGUAL</button>
+      <button onclick="editObjetivoDesdeCheckin()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Ha cambiado, quiero actualizarlo</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function confirmObjetivoVigente(){
+  S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
+  save();
+  document.getElementById('objetivoCheckinModal')?.remove();
+  showToast('Objetivo confirmado 👍','var(--acc4)');
+}
+function editObjetivoDesdeCheckin(){
+  document.getElementById('objetivoCheckinModal')?.remove();
+  S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
+  save();
+  go('perfil');
+  setTimeout(()=>{
+    const el=document.getElementById('f-objetivo');
+    if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
+  },200);
 }
 
 function editShoe(id){
@@ -6070,10 +6124,14 @@ REGLA DE ORO: Nunca listes datos que el atleta ya tiene delante. El atleta ya sa
 Cuando sea natural, ancla la respuesta a una sesión CONCRETA suya: un entreno pasado por su día/tipo (copiando el día de la tabla, ej. "el rodaje del martes a 5:10") y/o un entreno planificado o carrera próxima ("de cara a las series que tienes el jueves"). Eso demuestra que conoces su semana real, no que respondes en abstracto. No fuerces la referencia si no aporta, pero si hay un plan pendiente o una carrera cerca, tenlos presentes.
 Si tu estilo lleva humor: la broma SIEMPRE cuelga de un dato real suyo — una métrica, un entreno concreto, un plan. Humor genérico sin dato detrás está prohibido: esa es la diferencia entre gracioso y payaso. La gracia hace que el dato se recuerde, nunca lo sustituye.
 
+De vez en cuando (no en cada mensaje, solo cuando el patrón sea claro en los datos), si notas una mejora sostenida en un área — más resistencia, más volumen bien tolerado, ritmos que bajan — pregúntale de forma natural si quiere reorientar el enfoque hacia otra cosa (velocidad, un objetivo más ambicioso, una carrera nueva). Ejemplo de tono: "Oye, llevas semanas ganando resistencia de forma sólida — ¿quieres que metamos algo más de velocidad, o seguimos construyendo base?". Es una pregunta abierta, no una imposición: si el atleta dice que no o no contesta a eso, sigues con el plan tal cual.
+
 ━━━ ANÁLISIS DE ENTRENAMIENTO O IMAGEN ━━━
 
 Primero, extrae los datos en silencio (no los muestres al usuario). Guárdalos internamente.
 Al final del mensaje, escribe solo una línea técnica compacta para que el sistema registre los datos: "cadencia X p/min · FC media X ppm · t.suelo Xms · zancada Xcm"
+
+⚠️ Si el entreno es de series/intervalos/fartlek/tempo/umbral (esfuerzos variables con tramos de descanso o trote suave intercalados), la cadencia MEDIA de esa sesión no es un dato fiable — mezcla tramos de esfuerzo muy distinto y no refleja la cadencia real en ninguno de ellos. NO la uses como criterio de crítica, ni la menciones como un problema, en este tipo de entrenos. Sigue registrándola en la línea técnica final (el dato en sí no se pierde), pero no la comentes en el análisis en prosa salvo que el atleta pregunte específicamente por ella.
 
 Luego escribe el análisis en prosa corrida, sin secciones ni títulos, con tu personalidad. Estructura interna (no visible en el texto):
 - Arranca con lo más llamativo del entreno, con el dato exacto integrado en la frase.
@@ -6703,7 +6761,7 @@ function planCard(p, i){
           ${estado==='completado'?'✓ Hecho':'Marcar hecho'}
         </button>`:''}
         ${estado==='pendiente'?`
-        <button onclick="event.stopPropagation();markNoRealizado(${i})" style="background:var(--acc3)10;border:1.5px solid var(--acc3)40;border-radius:6px;padding:5px 10px;color:var(--acc3);font-size:11px;cursor:pointer;font-family:'Inter';transition:all .15s" title="Marcar como no realizado y recalcular">
+        <button onclick="event.stopPropagation();openNoRealizadoModal(${i})" style="background:var(--acc3)10;border:1.5px solid var(--acc3)40;border-radius:6px;padding:5px 10px;color:var(--acc3);font-size:11px;cursor:pointer;font-family:'Inter';transition:all .15s" title="Marcar como no realizado y recalcular">
           ✗ No realizado
         </button>`:''}
         ${estado==='no_realizado'?`
@@ -6767,6 +6825,92 @@ function markNoRealizado(i){
   save();
   go('planes');
   showToast('Entrenamiento marcado como no realizado','var(--acc3)');
+}
+
+// ---- MODAL "¿QUÉ HA PASADO?" al pulsar "No realizado" ----
+// Distingue el caso "estaba cansado/prefiero descansar" (que abre una vía de
+// ajuste del plan futuro hablando con el coach) de un simple contratiempo,
+// donde el usuario solo quiere borrar ese día o desplazar lo que queda.
+const CANSANCIO_MSGS=[
+  'No pasa nada, lo importante es escuchar al cuerpo.',
+  'Descansar también es entrenar — el cuerpo se adapta en el descanso, no solo en el esfuerzo.',
+  'Buena decisión. Forzar estando cansado suele salir más caro que un día de descanso.',
+  'Escuchar la fatiga a tiempo es lo que separa una buena temporada de una lesión.',
+  'Un día de descanso bien tomado nunca ha arruinado un plan. Lo contrario, sí.',
+];
+function openNoRealizadoModal(i){
+  document.getElementById('noRealizadoModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='noRealizadoModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:400px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--acc3);margin-bottom:.4rem">¿QUÉ HA PASADO CON ESTE ENTRENO?</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1.1rem">Elige la opción que mejor encaje.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="handleNoRealizadoCansado(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">😴 Prefiero descansar — me sentía cansado/a</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Podemos replantear los próximos entrenos si hace falta</div>
+      </button>
+      <button onclick="handleNoRealizadoEliminar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">🗑 No realizado — eliminar este entreno</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Se borra solo el de este día, el resto del plan sigue igual</div>
+      </button>
+      <button onclick="handleNoRealizadoDesplazar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">↪️ No realizado — desplazar mis entrenos 1 día</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Este y los siguientes se mueven un día hacia adelante</div>
+      </button>
+    </div>
+    <button onclick="document.getElementById('noRealizadoModal').remove()" style="margin-top:12px;width:100%;background:transparent;border:1px solid var(--border);border-radius:6px;padding:9px;cursor:pointer;color:var(--text3);font-size:12px;font-family:'Inter'">Cancelar</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+function handleNoRealizadoCansado(i){
+  document.getElementById('noRealizadoModal')?.remove();
+  markNoRealizado(i);
+  const msg=CANSANCIO_MSGS[Math.floor(Math.random()*CANSANCIO_MSGS.length)];
+  appConfirm(
+    '😴 DESCANSO REGISTRADO',
+    `${msg}<br><br>Si sientes algo de cansancio acumulado, podemos replantear los próximos entrenamientos. ¿Lo hablamos con ${coachNombre()}?`,
+    'SÍ, AJUSTAR PLAN',
+    ()=>recalcularPorCansancio(i),
+    'var(--acc2)'
+  );
+}
+function recalcularPorCansancio(i){
+  const p=S.planes[i];
+  if(!p)return;
+  const pending=(S.planes||[]).filter((_,j)=>j>i&&!S.planes[j].completado&&!S.planes[j].noRealizado).length;
+  const msg=`Hoy he preferido descansar en vez de hacer el entreno del ${fmtD(p.fecha)} — sentía cansancio acumulado. Tengo ${pending} sesion${pending!==1?'es':''} pendiente${pending!==1?'s':''} por delante. ¿Puedes replantear los próximos entrenamientos teniendo en cuenta esta fatiga?`;
+  go('chat');
+  const tryFill=(attempts)=>{
+    const inp=document.getElementById('cinput');
+    if(inp){ inp.value=msg; setTimeout(sendMsg,100); }
+    else if(attempts>0){ setTimeout(()=>tryFill(attempts-1),150); }
+  };
+  setTimeout(()=>tryFill(10),200);
+}
+function handleNoRealizadoEliminar(i){
+  document.getElementById('noRealizadoModal')?.remove();
+  deletePlan(i);
+}
+function handleNoRealizadoDesplazar(i){
+  document.getElementById('noRealizadoModal')?.remove();
+  if(!S.planes[i])return;
+  let shifted=0;
+  for(let j=i;j<S.planes.length;j++){
+    const pl=S.planes[j];
+    if(pl.completado) continue;
+    const d=new Date(pl.fecha+'T00:00:00');
+    d.setDate(d.getDate()+1);
+    pl.fecha=d.toISOString().slice(0,10);
+    if(pl.noRealizado) pl.noRealizado=false;
+    shifted++;
+  }
+  save();
+  go('planes');
+  showToast(`${shifted} entreno${shifted!==1?'s':''} desplazado${shifted!==1?'s':''} 1 día`,'var(--acc4)');
 }
 
 function toggleNoRealizado(i){
@@ -7017,6 +7161,7 @@ function savePerfil(){
     const el=document.getElementById('f-'+k);
     if(el)S.athlete[k]=['altura','peso','fcmax','fcreposo'].includes(k)?parseFloat(el.value):el.value;
   });
+  S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
   save();
   updateTopbar();
   alert('✅ Perfil guardado');
@@ -7663,6 +7808,7 @@ function initTheme(){
 }
 initTheme();
 checkDevModeFromUrl();
+checkObjetivoRecordatorio();
 go('dash');
 updateTopbar();
 updateStravaStatus();
