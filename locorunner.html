@@ -298,6 +298,15 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 
   .mc-val{font-size:22px}
   .t-item{grid-template-columns:64px 1fr 36px;gap:.5rem;padding:8px 10px}
+
+  .eq-reloj-row{flex-direction:column;text-align:center}
+  .eq-reloj-actions{margin-left:0 !important;width:100%;justify-content:center}
+  .eq-reloj-info{text-align:center}
+  .eq-shoe-card{flex-direction:column;align-items:center;text-align:center}
+  .eq-shoe-photo{width:100%;display:flex;justify-content:center}
+  .eq-shoe-photo img{width:150px !important;height:150px !important}
+  .eq-shoe-header{flex-direction:column;align-items:center !important;text-align:center}
+  .eq-shoe-btns{justify-content:center !important;width:100%}
 }
 
 @media(max-width:480px){
@@ -313,7 +322,7 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
   <button class="hamburger-btn" id="btnHamburger" onclick="toggleSidebar()" title="Menú" aria-label="Abrir menú">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
-  <div><div class="logo"><svg viewBox="0 0 325 96" role="img" aria-label="LocoRunner"><text class="lr-word" x="10" y="66" font-family="Bebas Neue,sans-serif" font-size="62">L</text><text class="lr-word" x="76" y="66" font-family="Bebas Neue,sans-serif" font-size="62">C</text><text class="lr-word" x="142" y="66" font-family="Bebas Neue,sans-serif" font-size="62" letter-spacing="1">RUNNER</text><circle class="lr-eye" cx="55" cy="42" r="16"/><circle class="lr-eye" cx="122" cy="46" r="12"/><circle class="lr-pupil" id="lrPupilL" cx="55" cy="36" r="6"/><circle class="lr-pupil" id="lrPupilR" cx="122" cy="41" r="4.5"/></svg><em>entrenador ia · running</em></div></div>
+  <div><div class="logo" onclick="go('dash')" style="cursor:pointer" title="Ir al Dashboard"><svg viewBox="0 0 325 96" role="img" aria-label="LocoRunner"><text class="lr-word" x="10" y="66" font-family="Bebas Neue,sans-serif" font-size="62">L</text><text class="lr-word" x="76" y="66" font-family="Bebas Neue,sans-serif" font-size="62">C</text><text class="lr-word" x="142" y="66" font-family="Bebas Neue,sans-serif" font-size="62" letter-spacing="1">RUNNER</text><circle class="lr-eye" cx="55" cy="42" r="16"/><circle class="lr-eye" cx="122" cy="46" r="12"/><circle class="lr-pupil" id="lrPupilL" cx="55" cy="36" r="6"/><circle class="lr-pupil" id="lrPupilR" cx="122" cy="41" r="4.5"/></svg><em>entrenador ia · running</em></div></div>
   <div class="tb-right">
     <button id="themeToggle" onclick="toggleTheme()" title="Cambiar tema" style="background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;color:var(--text2);cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">🌙</button>
     <button id="btnSetup" onclick="showSetupModal()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:5px 13px;cursor:pointer;font-size:12px;font-family:'Bebas Neue';letter-spacing:1px;display:none;align-items:center;gap:5px">
@@ -322,11 +331,7 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
     </button>
     <button id="btnFitImport" onclick="document.getElementById('fitImportInput').click()" title="Importar entrenamientos desde archivos .FIT (COROS, Garmin, etc.)" style="background:var(--c-zan);border:none;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:6px;color:#000;font-weight:600;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <span class="tb-btn-label">Importar FIT</span>
-    </button>
-    <button onclick="exportData()" title="Exportar copia de seguridad" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 11px;color:var(--text2);cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:5px;transition:all .15s" onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span class="tb-btn-label">Exportar</span>
+      <span class="tb-btn-label">Importar entrenamiento</span>
     </button>
 
   </div>
@@ -345,12 +350,12 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
   </button>
 
   <div class="nav-sec">Entrenamientos</div>
-  <button class="nav-btn" id="nb-list" onclick="go('list')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Todos los entrenos
-  </button>
   <button class="nav-btn" id="nb-planes" onclick="go('planes')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Mis planes
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Entrenos programados
     <span id="planesBadge" style="margin-left:auto;background:var(--acc3);color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-family:'JetBrains Mono'"></span>
+  </button>
+  <button class="nav-btn" id="nb-list" onclick="go('list')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Entrenos realizados
   </button>
 
   <div class="nav-sec">Datos</div>
@@ -380,6 +385,9 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
   </button>
 
   <div class="nav-sec" style="margin-top:auto">Config</div>
+  <button class="nav-btn" id="nb-tienda" onclick="go('tienda')" style="color:var(--acc)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>Tienda
+  </button>
   <button class="nav-btn" id="nb-perfil" onclick="go('perfil')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Mi perfil
   </button>
@@ -790,6 +798,7 @@ function go(v){
   else if(v==='chat')renderChat(m);
   else if(v==='planes')renderPlanes(m);
   else if(v==='perfil')renderPerfil(m);
+  else if(v==='tienda')renderTienda(m);
   updateBadge();
   updateTopbar();
 }
@@ -1687,17 +1696,17 @@ function renderEquipacion(el){
   <!-- RELOJ -->
   <div class="panel">
     <div class="panel-title">⌚ Reloj GPS</div>
-    <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+    <div class="eq-reloj-row" style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
       ${eq.reloj?.foto?`
       <div style="position:relative">
         <img src="${eq.reloj.foto}" alt="Reloj" style="width:90px;height:90px;object-fit:cover;border-radius:var(--r2);border:1px solid var(--border)">
         <button onclick="uploadRelojFoto()" title="Cambiar foto" style="position:absolute;bottom:4px;right:4px;background:#000000aa;border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text2);cursor:pointer;font-size:10px">📷</button>
       </div>`:`<div style="font-size:48px">${relojiconFor(eq.reloj?.marca)}</div>`}
-      <div>
+      <div class="eq-reloj-info">
         <div style="font-family:'Bebas Neue';font-size:24px;letter-spacing:2px;color:var(--acc)">${eq.reloj?.marca||'—'} ${eq.reloj?.modelo||''}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:4px">Marca de sincronización de datos</div>
       </div>
-      <div style="margin-left:auto;display:flex;gap:6px">
+      <div class="eq-reloj-actions" style="margin-left:auto;display:flex;gap:6px">
         ${!eq.reloj?.foto?`<button onclick="uploadRelojFoto()" style="background:var(--bg4);border:1px dashed var(--border2);border-radius:6px;padding:7px 12px;color:var(--text3);cursor:pointer;font-size:12px;font-family:'Inter'">📷 Foto</button>`:''}
         <button onclick="showSetupModal()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 14px;color:var(--text2);cursor:pointer;font-size:12px;font-family:'Inter'">✏️ Editar</button>
       </div>
@@ -1721,19 +1730,19 @@ function renderEquipacion(el){
       const barColor=pct>=90?'var(--acc3)':pct>=70?'var(--acc4)':z.color||'var(--acc2)';
       const status=pct>=90?'⚠️ Cambio pronto':pct>=70?'🔶 Desgaste medio':'✅ En buen estado';
       return`
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:1rem;display:flex;gap:1rem;align-items:flex-start">
+      <div class="eq-shoe-card" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:1rem;display:flex;gap:1rem;align-items:flex-start">
         ${z.foto?`
-        <div style="position:relative;flex-shrink:0">
+        <div class="eq-shoe-photo" style="position:relative;flex-shrink:0">
           <img src="${z.foto}" alt="${z.nombre}" style="width:110px;height:110px;object-fit:cover;border-radius:var(--r2);border:1px solid var(--border)">
           <button onclick="uploadShoeFoto(${z.id})" title="Cambiar foto" style="position:absolute;bottom:4px;right:4px;background:#000000aa;border:1px solid var(--border);border-radius:4px;padding:3px 6px;color:var(--text2);cursor:pointer;font-size:10px">📷</button>
         </div>`:''}
         <div style="flex:1;min-width:0">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:.75rem;flex-wrap:wrap">
+        <div class="eq-shoe-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:.75rem;flex-wrap:wrap">
           <div style="min-width:0">
             <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1px;color:${z.color||'var(--acc2)'}">${z.nombre}</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px">${z.activa?'Activa':'Retirada'} · max recomendado ${z.maxKm||800}km</div>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <div class="eq-shoe-btns" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
             ${!z.foto?`<button onclick="uploadShoeFoto(${z.id})" style="background:var(--bg4);border:1px dashed var(--border2);border-radius:5px;padding:4px 9px;color:var(--text3);cursor:pointer;font-size:11px;font-family:'Inter';white-space:nowrap">📷 Foto</button>`:''}
             <button onclick="editShoe(${z.id})" style="background:var(--bg4);border:1px solid var(--border);border-radius:5px;padding:4px 9px;color:var(--text2);cursor:pointer;font-size:11px;font-family:'Inter';white-space:nowrap">✏️ Editar</button>
             <button onclick="retireShoe(${z.id})" style="background:var(--bg4);border:1px solid var(--border);border-radius:5px;padding:4px 9px;color:var(--text3);cursor:pointer;font-size:11px;font-family:'Inter';white-space:nowrap">${z.activa?'Retirar':'Activar'}</button>
@@ -1779,6 +1788,20 @@ function renderEquipacion(el){
 function relojiconFor(marca){
   const icons={Coros:'🟢',Garmin:'🔵',Polar:'🔴',Suunto:'🟠',Apple:'⬛','Apple Watch':'⬛',Samsung:'🟣',Amazfit:'🟡'};
   return icons[marca]||'⌚';
+}
+
+function renderTienda(el){
+  el.innerHTML=`
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:60vh;gap:1.5rem">
+    <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="1.5" style="filter:drop-shadow(0 0 18px var(--acc)60)">
+      <circle cx="9" cy="21" r="1.4" fill="var(--acc)"/><circle cx="20" cy="21" r="1.4" fill="var(--acc)"/>
+      <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>
+    </svg>
+    <div>
+      <div style="font-family:'Bebas Neue';font-size:28px;letter-spacing:2px;color:var(--acc);margin-bottom:.5rem">TIENDA</div>
+      <div style="font-size:15px;color:var(--text2);max-width:380px">Pronto podrás adquirir productos de LocoRunner</div>
+    </div>
+  </div>`;
 }
 
 function showAddShoeModal(){
@@ -2649,6 +2672,8 @@ function saveKmGoal(){
 /* ============================================================
    PERSONAL RECORDS
 ============================================================ */
+const DEPORTES_LISTA = ['Running','Ciclismo','Natación','Fuerza / Gimnasio','Senderismo','Trail','Fútbol','Baloncesto','Tenis / Pádel','Yoga / Pilates','Esquí / Snowboard','Remo','Otro'];
+
 const PR_DISTANCES = [
   { key:'5k',   label:'5K',            minKm:4.8,  maxKm:5.5,  color:'var(--acc2)',  icon:'⚡' },
   { key:'10k',  label:'10K',           minKm:9.5,  maxKm:10.8, color:'var(--c-cad)', icon:'🔥' },
@@ -2718,7 +2743,7 @@ function renderPRPanel(E){
         ✏️ Editar marcas
       </button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem">
+    <div class="grid4">
       ${PR_DISTANCES.map(d=>{
         const pr=prs[d.key];
         const hasManualBetter=S.prs&&S.prs[d.key]&&(!prs[d.key]||S.prs[d.key].secs<=prs[d.key].secs);
@@ -3725,7 +3750,16 @@ function showAddTrainingModal(prefillDate=''){
         <input type="date" id="mt-fecha" value="${prefillDate||today}" style="${iStyle}">
       </div>
       <div>
-        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Tipo</div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Deporte</div>
+        <select id="mt-deporte" style="${iStyle}" onchange="toggleMtTipoField()">
+          ${DEPORTES_LISTA.map(d=>`<option>${d}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:.75rem;margin-bottom:.75rem" id="mt-tipo-wrap">
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Tipo de sesión</div>
         <select id="mt-tipo" style="${iStyle}">
           ${['Carrera','Rodaje base','Rodaje progresivo','Series','Fartlek','Tempo','Tirada larga','Recuperación activa','Trail','Competición','Gimnasio','Otro'].map(t=>`<option>${t}</option>`).join('')}
         </select>
@@ -3789,6 +3823,12 @@ function showAddTrainingModal(prefillDate=''){
   document.body.appendChild(modal);
 }
 
+function toggleMtTipoField(){
+  const dep=document.getElementById('mt-deporte')?.value;
+  const wrap=document.getElementById('mt-tipo-wrap');
+  if(wrap)wrap.style.display=(dep==='Running')?'':'none';
+}
+
 function saveManualTraining(){
   const fecha=document.getElementById('mt-fecha')?.value;
   const dist=parseFloat(document.getElementById('mt-dist')?.value);
@@ -3806,10 +3846,12 @@ function saveManualTraining(){
 
   const ritmo=secs&&dist ? secs/60/dist : 0;
 
+  const deporte=document.getElementById('mt-deporte')?.value||'Running';
   const t={
     id: Date.now(),
     fecha,
-    tipo: document.getElementById('mt-tipo')?.value||'Carrera',
+    deporte,
+    tipo: deporte==='Running'?(document.getElementById('mt-tipo')?.value||'Carrera'):deporte,
     dist,
     secs,
     ritmo,
@@ -7178,6 +7220,16 @@ function renderPerfil(el){
     </div>
   </div>
 
+  <!-- COPIA DE SEGURIDAD -->
+  <div class="panel">
+    <div class="panel-title">💾 Copia de seguridad</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:1rem">Exporta un backup completo de tus datos, o restaura uno anterior. No afecta a tus entrenamientos importados de .FIT.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="exportData()">📤 Exportar backup</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('importInput').click()">📁 Importar backup</button>
+    </div>
+  </div>
+
   <!-- ESTADO DEL ENTRENADOR IA -->
   ${renderUsagePanel()}`;
 }
@@ -7300,6 +7352,19 @@ function computeHrzFromRecords(records, fcmax){
   return pct;
 }
 
+// Traduce el campo 'sport' del FIT a nuestra lista de deportes
+function fitSportToDeporte(sport){
+  const map={
+    running:'Running', cycling:'Ciclismo', swimming:'Natación',
+    fitness_equipment:'Fuerza / Gimnasio', training:'Fuerza / Gimnasio',
+    hiking:'Senderismo', walking:'Senderismo', mountaineering:'Trail',
+    soccer:'Fútbol', basketball:'Baloncesto', tennis:'Tenis / Pádel',
+    alpine_skiing:'Esquí / Snowboard', snowboarding:'Esquí / Snowboard',
+    cross_country_skiing:'Esquí / Snowboard', rowing:'Remo',
+  };
+  return map[sport]||(sport&&sport!=='generic'?'Otro':'Running');
+}
+
 // Clasifica el tipo de entrenamiento a partir de distancia/duración (heurística, editable después)
 function classifyFitTipo(dist,secs){
   if(dist>15)return'Tirada larga';
@@ -7347,10 +7412,11 @@ async function handleFitFiles(fileList){
       if(dist<=0||secs<=0){failed++;failedNames.push(file.name);continue;}
 
       const ritmo=dist>0?(secs/60/dist):0;
+      const deporte=fitSportToDeporte(session.sport);
       const fc=session.avg_heart_rate?Math.round(session.avg_heart_rate):null;
-      // Cadencia: si viene por debajo de 110, el dispositivo reporta pasos de una sola pierna -> x2
+      // Cadencia: si viene por debajo de 110, el dispositivo reporta pasos de una sola pierna -> x2 (solo aplica a running)
       let cad=session.avg_cadence?Math.round(session.avg_cadence):null;
-      if(cad&&cad<110)cad=cad*2;
+      if(deporte==='Running'&&cad&&cad<110)cad=cad*2;
       const ts=session.avg_stance_time?Math.round(session.avg_stance_time):null; // ms
       const zan=session.avg_step_length?Math.round(session.avg_step_length/10):null; // mm -> cm
       const dn=session.total_ascent?Math.round(session.total_ascent):0;
