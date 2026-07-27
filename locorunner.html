@@ -268,10 +268,7 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Exportar
     </button>
-    <button onclick="exportDemo()" title="Generar versión demo para compartir" style="background:var(--acc2)15;border:1px solid var(--acc2)40;border-radius:6px;padding:5px 11px;color:var(--acc2);cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:5px;transition:all .15s" onmouseover="this.style.background='var(--acc2)25'" onmouseout="this.style.background='var(--acc2)15'">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-      Demo
-    </button>
+
   </div>
 </div>
 <input type="file" id="importInput" accept=".json" style="display:none">
@@ -7726,71 +7723,6 @@ function exportData(){
   }, 400);
 }
 
-function exportDemo(){
-  // Build a demo version with sample data replacing real user data
-  const demoState = JSON.parse(JSON.stringify(defState()));
-  // Anonymized sample athlete
-  demoState.isNewUser = false;
-  demoState.athlete = {
-    nombre:'Javier',sexo:'hombre',altura:178,peso:72,edad:'35-45',
-    objetivo:'Media Maratón Madrid',objetivo_fecha:'2026-10-18',objetivo_ritmo:'4:55',
-    lesiones:'Fascitis plantar izquierda (2024, resuelta)',fcmax:183,fcreposo:48,
-    deportes:[],gymDays:[1,4],gymMode:'fixed'
-  };
-  demoState.coach={genero:'masculino',estilo:'exigente'};
-  // Sample workouts covering ~10 weeks
-  const base=new Date('2026-03-10');
-  const sampleTypes=[
-    {tipo:'Rodaje',km:10,pace:5.8,fc:138,cad:167,zan:102,ts:271,dn:82},{tipo:'Activación',km:6,pace:6.1,fc:128,cad:165,zan:100,ts:276,dn:60},
-    {tipo:'Series',km:8,pace:5.1,fc:162,cad:173,zan:107,ts:252,dn:75},{tipo:'Rodaje',km:13,pace:5.9,fc:140,cad:166,zan:101,ts:268,dn:110},
-    {tipo:'Rodaje',km:9,pace:5.6,fc:142,cad:168,zan:103,ts:265,dn:90},{tipo:'Tempo',km:7,pace:5.0,fc:156,cad:172,zan:106,ts:255,dn:70},
-    {tipo:'Rodaje',km:15,pace:6.0,fc:136,cad:166,zan:100,ts:270,dn:125},{tipo:'Activación',km:5,pace:6.3,fc:125,cad:164,zan:99,ts:279,dn:55},
-    {tipo:'Series',km:9,pace:4.9,fc:165,cad:175,zan:108,ts:248,dn:80},{tipo:'Rodaje largo',km:18,pace:5.85,fc:141,cad:167,zan:102,ts:266,dn:145},
-    {tipo:'Rodaje',km:10,pace:5.7,fc:139,cad:168,zan:103,ts:264,dn:88},{tipo:'Fartlek',km:11,pace:5.4,fc:150,cad:171,zan:105,ts:258,dn:95},
-    {tipo:'Rodaje',km:12,pace:5.75,fc:140,cad:167,zan:102,ts:267,dn:100},{tipo:'Activación',km:7,pace:6.0,fc:130,cad:165,zan:101,ts:274,dn:65},
-    {tipo:'Rodaje largo',km:20,pace:5.9,fc:143,cad:167,zan:103,ts:265,dn:160},{tipo:'Rodaje',km:8,pace:5.8,fc:137,cad:167,zan:102,ts:269,dn:80},
-    {tipo:'Series',km:10,pace:5.0,fc:163,cad:174,zan:107,ts:251,dn:85},{tipo:'Rodaje',km:11,pace:5.7,fc:140,cad:168,zan:103,ts:265,dn:92},
-    {tipo:'Rodaje corto',km:6,pace:5.85,fc:132,cad:166,zan:101,ts:271,dn:60},{tipo:'Rodaje largo',km:22,pace:5.95,fc:144,cad:168,zan:103,ts:264,dn:170},
-  ];
-  demoState.entrenamientos=sampleTypes.map((t,i)=>{
-    const d=new Date(base); d.setDate(d.getDate()+i*3+Math.floor(i/5)*2);
-    const jitter=(v,r)=>Math.round((v+(Math.random()-.5)*r)*10)/10;
-    return {id:i+1,fecha:isoLocal(d),tipo:t.tipo,dist:jitter(t.km,1.5),
-      secs:Math.round(jitter(t.km,1)*jitter(t.pace,0.2)*60),
-      ritmo:jitter(t.pace,0.15),fc:jitter(t.fc,8),cad:Math.round(jitter(t.cad,4)),
-      zan:Math.round(jitter(t.zan,5)),ts:Math.round(jitter(t.ts,12)),dn:Math.round(jitter(t.dn,15)),
-      hrz:[5,45,35,12,3],vo2est:Math.round(jitter(46,3)),notas:'',zapatilla:1};
-  });
-  demoState.equipacion={
-    reloj:{marca:'Garmin',modelo:'Forerunner 265'},
-    zapatillas:[
-      {id:1,nombre:'Nike Vomero 17',kmPrevios:120,kmRegistrados:0,maxKm:700,color:'#ff8a3d',activa:true},
-      {id:2,nombre:'Brooks Ghost 16',kmPrevios:0,kmRegistrados:0,maxKm:800,color:'#45c4ff',activa:false},
-    ]
-  };
-  demoState.eventos=[
-    {id:1,nombre:'10K Palencia',fecha:'2026-08-30',dist:'10K',tipo:'Carrera',objetivo:'sub-47'},
-    {id:2,nombre:'Media Maratón Madrid',fecha:'2026-10-18',dist:'21.1km',tipo:'Media maratón',objetivo:'sub-1:44'},
-  ];
-  demoState.planes=[];
-  demoState.apiKey='';
-  demoState.strava={};
-
-  // Embed demo state into a fresh copy of this HTML file
-  const html=document.documentElement.outerHTML;
-  // Replace the localStorage load with inline demo data injection
-  const demoScript=`\n<script>\n(function(){\n  var SK='stride_v2_b';\n  var demoData=${JSON.stringify({_stride_version:2,_exported:new Date().toISOString(),_description:'Locorunner Demo',data:demoState})};\n  try{ if(!localStorage.getItem(SK)){ localStorage.setItem(SK,JSON.stringify(demoData.data)); } }catch(e){}\n})();\n<\/script>\n`;
-  const demoHtml=html.replace('</head>',demoScript+'</head>');
-
-  const blob=new Blob([demoHtml],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download=`locorunner_demo_${hoyISO()}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('✅ Versión demo generada · datos de muestra anonimizados','var(--acc2)');
-}
 
 function importData(){
   // Triggered by the Importar button — delegates to the file input
