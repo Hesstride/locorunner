@@ -581,6 +581,18 @@ function tickColor(){
 }
 function fmtT(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return h>0?h+'h'+m.toString().padStart(2,'0')+'m':m+':'+(s<10?'0':'')+s;}
 function fmtD(str){const d=new Date(str+'T00:00:00');return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});}
+// Suma/resta días a una fecha 'YYYY-MM-DD' sin pasar por toISOString() (que
+// convierte a UTC y en husos horarios positivos como España puede devolver
+// la misma fecha o retroceder un día). Trabaja siempre en local.
+function addDiasFecha(str,dias){
+  const [y,m,d]=str.split('-').map(Number);
+  const dt=new Date(y,m-1,d);
+  dt.setDate(dt.getDate()+dias);
+  const yy=dt.getFullYear();
+  const mm=String(dt.getMonth()+1).padStart(2,'0');
+  const dd=String(dt.getDate()).padStart(2,'0');
+  return `${yy}-${mm}-${dd}`;
+}
 
 /* ============================================================
    FECHAS — SIEMPRE EN HORA LOCAL, NUNCA UTC
@@ -6902,9 +6914,7 @@ function handleNoRealizadoDesplazar(i){
   for(let j=i;j<S.planes.length;j++){
     const pl=S.planes[j];
     if(pl.completado) continue;
-    const d=new Date(pl.fecha+'T00:00:00');
-    d.setDate(d.getDate()+1);
-    pl.fecha=d.toISOString().slice(0,10);
+    pl.fecha=addDiasFecha(pl.fecha,1);
     if(pl.noRealizado) pl.noRealizado=false;
     shifted++;
   }
