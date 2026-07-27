@@ -6909,15 +6909,17 @@ function handleNoRealizadoEliminar(i){
 }
 function handleNoRealizadoDesplazar(i){
   document.getElementById('noRealizadoModal')?.remove();
-  if(!S.planes[i])return;
+  const base=S.planes[i];
+  if(!base)return;
+  const fromFecha=base.fecha; // fecha original, antes de mover nada
   let shifted=0;
-  for(let j=i;j<S.planes.length;j++){
-    const pl=S.planes[j];
-    if(pl.completado) continue;
+  S.planes.forEach(pl=>{
+    if(pl.completado) return;
+    if(pl.fecha < fromFecha) return; // no tocar planes de días ya pasados respecto a este
     pl.fecha=addDiasFecha(pl.fecha,1);
     if(pl.noRealizado) pl.noRealizado=false;
     shifted++;
-  }
+  });
   save();
   go('planes');
   showToast(`${shifted} entreno${shifted!==1?'s':''} desplazado${shifted!==1?'s':''} 1 día`,'var(--acc4)');
