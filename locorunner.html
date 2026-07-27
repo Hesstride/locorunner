@@ -95,11 +95,14 @@
   --tt-gimnasio:#7c3aed;--tt-tecnica:#0284c7;--tt-descanso:#4b5563;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;height:100dvh;overflow:hidden}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px}
 
 /* ===== LAYOUT ===== */
-.app{display:grid;grid-template-columns:230px 1fr;grid-template-rows:52px 1fr;height:100vh}
+.app{display:grid;grid-template-columns:230px 1fr;grid-template-rows:52px 1fr;height:100vh;height:100dvh}
+.hamburger-btn{display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text2);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+.sidebar-overlay{display:none;position:fixed;top:52px;left:0;right:0;bottom:0;background:#00000080;z-index:550}
+.sidebar-overlay.show{display:block}
 .topbar{grid-column:1/-1;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.25rem;gap:1rem;z-index:20}
 .logo{line-height:1;display:block}
 .logo svg{height:26px;width:auto;display:block}
@@ -176,7 +179,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .sA{color:var(--acc)}.sB{color:var(--acc2)}.sC{color:var(--acc4)}.sD{color:var(--acc3)}
 
 /* ===== CHAT ===== */
-.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 52px - 2.5rem - 100px)}
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 52px - 2.5rem - 100px);height:calc(100dvh - 52px - 2.5rem - 100px)}
 .chat-msgs{flex:1;overflow-y:auto;padding:.9rem;display:flex;flex-direction:column;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r) var(--r) 0 0}
 .msg-u{align-self:flex-end;max-width:82%}
 .msg-a{align-self:flex-start;max-width:86%}
@@ -233,6 +236,14 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 .cmp-row .lbl{color:var(--text2);font-size:11px}
 .better{color:var(--c-zan)}.worse{color:var(--c-ts)}
 
+/* ===== CALENDAR ===== */
+.cal-head-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
+.cal-head-grid div{text-align:center;font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;padding:4px 0}
+.cal-days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-day{height:64px;border-radius:6px;padding:4px;cursor:pointer;transition:border-color .15s;overflow:hidden}
+.cal-day-num{font-size:11px;margin-bottom:2px;line-height:1}
+.cal-day-badge{border-radius:3px;padding:1px 3px;font-size:8px;margin-bottom:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.4}
+
 /* SCROLLBAR */
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -246,6 +257,47 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 @keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 @keyframes slideOutRight{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}
+
+/* ===== RESPONSIVE: TABLET ===== */
+@media(max-width:1024px){
+  .grid5{grid-template-columns:repeat(3,1fr)}
+  .nutr-grid{grid-template-columns:1fr 1fr}
+}
+
+/* ===== RESPONSIVE: MOBILE (sidebar pasa a menú lateral tipo drawer) ===== */
+@media(max-width:768px){
+  .app{grid-template-columns:1fr}
+  .hamburger-btn{display:flex}
+  .topbar{padding:0 .75rem;gap:.6rem}
+  .logo svg{height:22px}
+  .logo em{font-size:9px}
+  .tb-right{gap:6px}
+
+  .sidebar{
+    position:fixed;top:52px;left:0;bottom:0;width:230px;max-width:78vw;
+    transform:translateX(-100%);transition:transform .22s ease;z-index:600;
+    box-shadow:4px 0 24px #00000060;
+  }
+  .sidebar.open{transform:translateX(0)}
+
+  .main{padding:.85rem}
+  .grid2,.grid3,.grid4,.nutr-grid,.dash-top,.dash-body,.bio-grid{grid-template-columns:1fr}
+  .grid5{grid-template-columns:repeat(2,1fr)}
+  .dash-body{align-items:normal}
+
+  .cal-days-grid,.cal-head-grid{gap:2px}
+  .cal-day{height:44px;padding:2px;border-radius:4px}
+  .cal-day-num{font-size:9px;margin-bottom:1px}
+  .cal-day-badge{font-size:6.5px;padding:0 2px;margin-bottom:0}
+  .cal-head-grid div{font-size:8px;padding:2px 0}
+
+  .mc-val{font-size:22px}
+  .t-item{grid-template-columns:64px 1fr 36px;gap:.5rem;padding:8px 10px}
+}
+
+@media(max-width:480px){
+  .chip{font-size:10px;padding:3px 8px}
+}
 </style>
 </head>
 <body>
@@ -253,6 +305,9 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 
 <!-- TOPBAR -->
 <div class="topbar">
+  <button class="hamburger-btn" id="btnHamburger" onclick="toggleSidebar()" title="Menú" aria-label="Abrir menú">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <div><div class="logo"><svg viewBox="0 0 325 96" role="img" aria-label="LocoRunner"><text class="lr-word" x="10" y="66" font-family="Bebas Neue,sans-serif" font-size="62">L</text><text class="lr-word" x="76" y="66" font-family="Bebas Neue,sans-serif" font-size="62">C</text><text class="lr-word" x="142" y="66" font-family="Bebas Neue,sans-serif" font-size="62" letter-spacing="1">RUNNER</text><circle class="lr-eye" cx="55" cy="42" r="16"/><circle class="lr-eye" cx="122" cy="46" r="12"/><circle class="lr-pupil" id="lrPupilL" cx="55" cy="36" r="6"/><circle class="lr-pupil" id="lrPupilR" cx="122" cy="41" r="4.5"/></svg><em>entrenador ia · running</em></div></div>
   <div class="tb-right">
     <button id="themeToggle" onclick="toggleTheme()" title="Cambiar tema" style="background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;color:var(--text2);cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">🌙</button>
@@ -268,7 +323,10 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Exportar
     </button>
-
+    <button onclick="exportDemo()" title="Generar versión demo para compartir" style="background:var(--acc2)15;border:1px solid var(--acc2)40;border-radius:6px;padding:5px 11px;color:var(--acc2);cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:5px;transition:all .15s" onmouseover="this.style.background='var(--acc2)25'" onmouseout="this.style.background='var(--acc2)15'">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      Demo
+    </button>
   </div>
 </div>
 <input type="file" id="importInput" accept=".json" style="display:none">
@@ -326,6 +384,7 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 </div>
 
 <!-- MAIN -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 <div class="main" id="main"></div>
 </div>
 
@@ -701,8 +760,17 @@ function fcInsight(t){
    NAVIGATION
 ============================================================ */
 let view='dash';
+function toggleSidebar(){
+  document.querySelector('.sidebar')?.classList.toggle('open');
+  document.getElementById('sidebarOverlay')?.classList.toggle('show');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar')?.classList.remove('open');
+  document.getElementById('sidebarOverlay')?.classList.remove('show');
+}
 function go(v){
   view=v;
+  closeSidebar();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
   const nb=document.getElementById('nb-'+v);
   if(nb)nb.classList.add('on');
@@ -2807,12 +2875,12 @@ function renderCalendario(el){
       </div>
 
       <!-- Grid header -->
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px">
-        ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div style="text-align:center;font-size:10px;color:var(--text3);font-family:'JetBrains Mono';padding:4px 0">${d}</div>`).join('')}
+      <div class="cal-head-grid">
+        ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div>${d}</div>`).join('')}
       </div>
 
       <!-- Grid days -->
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+      <div class="cal-days-grid">
         ${Array(startDow).fill('<div></div>').join('')}
         ${Array.from({length:daysInMonth},(_,i)=>{
           const day=i+1;
@@ -2823,11 +2891,11 @@ function renderCalendario(el){
           const isPast=new Date(ds+'T00:00:00')<today;
           // Check for future planned sessions from S.planes
           const hasPlan=!hasEnt&&(S.planes||[]).some(p=>p.fecha===ds&&!p.completado);
-          return`<div onclick="calDayClick('${ds}')" style="height:64px;background:${isToday?'var(--acc)15':'var(--bg3)'};border:1.5px solid ${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'};border-radius:6px;padding:4px;cursor:pointer;transition:border-color .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc2)50'" onmouseout="this.style.borderColor='${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}'">
-            <div style="font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':isPast?'var(--text3)':'var(--text)'};margin-bottom:2px;line-height:1">${day}</div>
-            ${hasEnt?`<div style="background:var(--acc2)25;border-radius:3px;padding:1px 3px;font-size:8px;color:var(--acc2);margin-bottom:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.4">${hasEnt[0].dist}km</div>`:''}
-            ${hasEv?hasEv.map(ev=>`<div style="background:var(--acc3)25;border-radius:3px;padding:1px 3px;font-size:8px;color:var(--acc3);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.4">🏁 ${ev.nombre.split(' ')[0]}</div>`).join(''):''}
-            ${hasPlan?`<div style="background:var(--acc4)20;border-radius:3px;padding:1px 3px;font-size:8px;color:var(--acc4);line-height:1.4">⚡ plan</div>`:''}
+          return`<div class="cal-day" onclick="calDayClick('${ds}')" style="background:${isToday?'var(--acc)15':'var(--bg3)'};border:1.5px solid ${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}" onmouseover="this.style.borderColor='var(--acc2)50'" onmouseout="this.style.borderColor='${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}'">
+            <div class="cal-day-num" style="font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':isPast?'var(--text3)':'var(--text)'}">${day}</div>
+            ${hasEnt?`<div class="cal-day-badge" style="background:var(--acc2)25;color:var(--acc2)">${hasEnt[0].dist}km</div>`:''}
+            ${hasEv?hasEv.map(ev=>`<div class="cal-day-badge" style="background:var(--acc3)25;color:var(--acc3)">🏁 ${ev.nombre.split(' ')[0]}</div>`).join(''):''}
+            ${hasPlan?`<div class="cal-day-badge" style="background:var(--acc4)20;color:var(--acc4)">⚡ plan</div>`:''}
           </div>`;
         }).join('')}
       </div>
@@ -5153,7 +5221,7 @@ function _openGlossaryPanel(term){
   const panel=document.createElement('div');
   panel.id='glossaryPanel';
   panel.dataset.term=term;
-  panel.style.cssText='position:fixed;right:0;top:52px;width:320px;height:calc(100vh - 52px);background:var(--bg2);border-left:1px solid var(--border2);z-index:500;display:flex;flex-direction:column;animation:slideInRight .25s ease;overflow:hidden;box-shadow:-4px 0 24px #00000060;';
+  panel.style.cssText='position:fixed;right:0;top:52px;width:min(320px,100vw);height:calc(100vh - 52px);height:calc(100dvh - 52px);background:var(--bg2);border-left:1px solid var(--border2);z-index:500;display:flex;flex-direction:column;animation:slideInRight .25s ease;overflow:hidden;box-shadow:-4px 0 24px #00000060;';
   panel.onclick=e=>e.stopPropagation();
 
   // Header
@@ -5356,7 +5424,7 @@ async function _openCitationPanel(author, year, journal){
   const panel=document.createElement('div');
   panel.id='citationPanel';
   panel.dataset.ref=`${author}${year}`;
-  panel.style.cssText='position:fixed;right:0;top:52px;width:360px;height:calc(100vh - 52px);background:var(--bg2);border-left:1px solid var(--acc4)40;z-index:500;display:flex;flex-direction:column;animation:slideInRight .25s ease;overflow:hidden;box-shadow:-4px 0 24px #00000060;';
+  panel.style.cssText='position:fixed;right:0;top:52px;width:min(360px,100vw);height:calc(100vh - 52px);height:calc(100dvh - 52px);background:var(--bg2);border-left:1px solid var(--acc4)40;z-index:500;display:flex;flex-direction:column;animation:slideInRight .25s ease;overflow:hidden;box-shadow:-4px 0 24px #00000060;';
   panel.onclick=e=>e.stopPropagation();
 
   // Header
@@ -7723,6 +7791,71 @@ function exportData(){
   }, 400);
 }
 
+function exportDemo(){
+  // Build a demo version with sample data replacing real user data
+  const demoState = JSON.parse(JSON.stringify(defState()));
+  // Anonymized sample athlete
+  demoState.isNewUser = false;
+  demoState.athlete = {
+    nombre:'Javier',sexo:'hombre',altura:178,peso:72,edad:'35-45',
+    objetivo:'Media Maratón Madrid',objetivo_fecha:'2026-10-18',objetivo_ritmo:'4:55',
+    lesiones:'Fascitis plantar izquierda (2024, resuelta)',fcmax:183,fcreposo:48,
+    deportes:[],gymDays:[1,4],gymMode:'fixed'
+  };
+  demoState.coach={genero:'masculino',estilo:'exigente'};
+  // Sample workouts covering ~10 weeks
+  const base=new Date('2026-03-10');
+  const sampleTypes=[
+    {tipo:'Rodaje',km:10,pace:5.8,fc:138,cad:167,zan:102,ts:271,dn:82},{tipo:'Activación',km:6,pace:6.1,fc:128,cad:165,zan:100,ts:276,dn:60},
+    {tipo:'Series',km:8,pace:5.1,fc:162,cad:173,zan:107,ts:252,dn:75},{tipo:'Rodaje',km:13,pace:5.9,fc:140,cad:166,zan:101,ts:268,dn:110},
+    {tipo:'Rodaje',km:9,pace:5.6,fc:142,cad:168,zan:103,ts:265,dn:90},{tipo:'Tempo',km:7,pace:5.0,fc:156,cad:172,zan:106,ts:255,dn:70},
+    {tipo:'Rodaje',km:15,pace:6.0,fc:136,cad:166,zan:100,ts:270,dn:125},{tipo:'Activación',km:5,pace:6.3,fc:125,cad:164,zan:99,ts:279,dn:55},
+    {tipo:'Series',km:9,pace:4.9,fc:165,cad:175,zan:108,ts:248,dn:80},{tipo:'Rodaje largo',km:18,pace:5.85,fc:141,cad:167,zan:102,ts:266,dn:145},
+    {tipo:'Rodaje',km:10,pace:5.7,fc:139,cad:168,zan:103,ts:264,dn:88},{tipo:'Fartlek',km:11,pace:5.4,fc:150,cad:171,zan:105,ts:258,dn:95},
+    {tipo:'Rodaje',km:12,pace:5.75,fc:140,cad:167,zan:102,ts:267,dn:100},{tipo:'Activación',km:7,pace:6.0,fc:130,cad:165,zan:101,ts:274,dn:65},
+    {tipo:'Rodaje largo',km:20,pace:5.9,fc:143,cad:167,zan:103,ts:265,dn:160},{tipo:'Rodaje',km:8,pace:5.8,fc:137,cad:167,zan:102,ts:269,dn:80},
+    {tipo:'Series',km:10,pace:5.0,fc:163,cad:174,zan:107,ts:251,dn:85},{tipo:'Rodaje',km:11,pace:5.7,fc:140,cad:168,zan:103,ts:265,dn:92},
+    {tipo:'Rodaje corto',km:6,pace:5.85,fc:132,cad:166,zan:101,ts:271,dn:60},{tipo:'Rodaje largo',km:22,pace:5.95,fc:144,cad:168,zan:103,ts:264,dn:170},
+  ];
+  demoState.entrenamientos=sampleTypes.map((t,i)=>{
+    const d=new Date(base); d.setDate(d.getDate()+i*3+Math.floor(i/5)*2);
+    const jitter=(v,r)=>Math.round((v+(Math.random()-.5)*r)*10)/10;
+    return {id:i+1,fecha:isoLocal(d),tipo:t.tipo,dist:jitter(t.km,1.5),
+      secs:Math.round(jitter(t.km,1)*jitter(t.pace,0.2)*60),
+      ritmo:jitter(t.pace,0.15),fc:jitter(t.fc,8),cad:Math.round(jitter(t.cad,4)),
+      zan:Math.round(jitter(t.zan,5)),ts:Math.round(jitter(t.ts,12)),dn:Math.round(jitter(t.dn,15)),
+      hrz:[5,45,35,12,3],vo2est:Math.round(jitter(46,3)),notas:'',zapatilla:1};
+  });
+  demoState.equipacion={
+    reloj:{marca:'Garmin',modelo:'Forerunner 265'},
+    zapatillas:[
+      {id:1,nombre:'Nike Vomero 17',kmPrevios:120,kmRegistrados:0,maxKm:700,color:'#ff8a3d',activa:true},
+      {id:2,nombre:'Brooks Ghost 16',kmPrevios:0,kmRegistrados:0,maxKm:800,color:'#45c4ff',activa:false},
+    ]
+  };
+  demoState.eventos=[
+    {id:1,nombre:'10K Palencia',fecha:'2026-08-30',dist:'10K',tipo:'Carrera',objetivo:'sub-47'},
+    {id:2,nombre:'Media Maratón Madrid',fecha:'2026-10-18',dist:'21.1km',tipo:'Media maratón',objetivo:'sub-1:44'},
+  ];
+  demoState.planes=[];
+  demoState.apiKey='';
+  demoState.strava={};
+
+  // Embed demo state into a fresh copy of this HTML file
+  const html=document.documentElement.outerHTML;
+  // Replace the localStorage load with inline demo data injection
+  const demoScript=`\n<script>\n(function(){\n  var SK='stride_v2_b';\n  var demoData=${JSON.stringify({_stride_version:2,_exported:new Date().toISOString(),_description:'Locorunner Demo',data:demoState})};\n  try{ if(!localStorage.getItem(SK)){ localStorage.setItem(SK,JSON.stringify(demoData.data)); } }catch(e){}\n})();\n<\/script>\n`;
+  const demoHtml=html.replace('</head>',demoScript+'</head>');
+
+  const blob=new Blob([demoHtml],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`locorunner_demo_${hoyISO()}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Versión demo generada · datos de muestra anonimizados','var(--acc2)');
+}
 
 function importData(){
   // Triggered by the Importar button — delegates to the file input
@@ -7734,7 +7867,7 @@ function showToast(msg, color){
   if(existing) existing.remove();
   const t = document.createElement('div');
   t.id = 'strideToast';
-  t.style.cssText = `position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1.5px solid ${color};border-radius:var(--r);padding:12px 18px;font-size:13px;color:var(--text);z-index:9999;box-shadow:0 4px 24px #00000080;font-family:'Inter';max-width:340px;line-height:1.5;animation:fadeInUp .3s ease`;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1.5px solid ${color};border-radius:var(--r);padding:12px 18px;font-size:13px;color:var(--text);z-index:9999;box-shadow:0 4px 24px #00000080;font-family:'Inter';max-width:min(340px,calc(100vw - 48px));line-height:1.5;animation:fadeInUp .3s ease`;
   t.innerHTML = msg;
   document.body.appendChild(t);
   setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';setTimeout(()=>t.remove(),400);}, 4000);
