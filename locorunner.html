@@ -2781,9 +2781,10 @@ function renderCalendario(el){
   const monthsFull=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   // Map events and entrenos by date string
-  const evByDate={}, entByDate={};
+  const evByDate={}, entByDate={}, planByDate={};
   eventos.forEach(e=>{ if(!evByDate[e.fecha])evByDate[e.fecha]=[]; evByDate[e.fecha].push(e); });
   S.entrenamientos.forEach(e=>{ if(!entByDate[e.fecha])entByDate[e.fecha]=[]; entByDate[e.fecha].push(e); });
+  (S.planes||[]).forEach(p=>{ if(p.fecha&&!p.completado){ if(!planByDate[p.fecha])planByDate[p.fecha]=[]; planByDate[p.fecha].push(p); } });
 
   // Next 7 days entrenos planned (from planes)
   const next7Plans=[];
@@ -2824,7 +2825,7 @@ function renderCalendario(el){
           const hasEnt=entByDate[ds];
           const isPast=new Date(ds+'T00:00:00')<today;
           // Check for future planned sessions from S.planes
-          const hasPlan=!hasEnt&&!isPast&&(S.planes||[]).some(p=>p.fecha===ds&&!p.completado);
+          const hasPlan=!hasEnt&&(S.planes||[]).some(p=>p.fecha===ds&&!p.completado);
           return`<div onclick="calDayClick('${ds}')" style="height:64px;background:${isToday?'var(--acc)15':'var(--bg3)'};border:1.5px solid ${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'};border-radius:6px;padding:4px;cursor:pointer;transition:border-color .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc2)50'" onmouseout="this.style.borderColor='${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}'">
             <div style="font-size:11px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':isPast?'var(--text3)':'var(--text)'};margin-bottom:2px;line-height:1">${day}</div>
             ${hasEnt?`<div style="background:var(--acc2)25;border-radius:3px;padding:1px 3px;font-size:8px;color:var(--acc2);margin-bottom:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:1.4">${hasEnt[0].dist}km</div>`:''}
@@ -2884,12 +2885,18 @@ function renderCalendario(el){
         ${next7Plans.map(day=>{
           const ents=entByDate[day.date]||[];
           const evs=evByDate[day.date]||[];
+          const plans=ents.length?[]:(planByDate[day.date]||[]);
           return`<div style="display:flex;gap:.5rem;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border)">
             <div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono';width:48px;flex-shrink:0;padding-top:2px">${day.label}</div>
             <div style="flex:1">
               ${ents.map(e=>`<div style="font-size:11px;color:var(--acc2);background:var(--acc2)15;border-radius:4px;padding:2px 6px;margin-bottom:2px;cursor:pointer" onclick="openTrain(${e.id})">${e.tipo} ${e.dist}km</div>`).join('')}
               ${evs.map(e=>`<div style="font-size:11px;color:var(--acc3);background:var(--acc3)15;border-radius:4px;padding:2px 6px;margin-bottom:2px">🏁 ${e.nombre}</div>`).join('')}
-              ${!ents.length&&!evs.length?`<div style="font-size:10px;color:var(--text3)">Sin actividad</div>`:''}
+              ${plans.map(p=>{
+                const titleMatch=(p.contenido||'').match(/##\s*🎯\s*ENTRENAMIENTO DE HOY[^\n]*\n/);
+                const ptitle=titleMatch?titleMatch[0].replace(/##\s*🎯\s*ENTRENAMIENTO DE HOY\s*[—-]?\s*/,'').trim():'Plan generado';
+                return`<div style="font-size:11px;color:var(--acc4);background:var(--acc4)15;border-radius:4px;padding:2px 6px;margin-bottom:2px;cursor:pointer" onclick="go('planes')">⚡ ${ptitle}</div>`;
+              }).join('')}
+              ${!ents.length&&!evs.length&&!plans.length?`<div style="font-size:10px;color:var(--text3)">Sin actividad</div>`:''}
             </div>
           </div>`;
         }).join('')}
@@ -3309,7 +3316,7 @@ function renderScience(el){
       <div style="font-size:12px;color:var(--text2);line-height:1.9">
         ${alertRow('FC reposo elevada', E.slice(-3).some(e=>e.fc&&e.fc>a.fcmax*0.75), 'FCmax 75%+ en rodajes fáciles indica fatiga acumulada')}
         ${alertRow('Descenso rendimiento 3+ días', false, 'Sin señales actuales detectadas')}
-        ${alertRow('Cadencia caída sostenida', E.slice(-3).every(e=>!e.cad||e.cad<156), 'Cad <156 en 3 seguidos puede indicar fatiga neuromuscular')}
+        ${alertRow('Cadencia caída sostenida', E.length>=3&&E.slice(-3).every(e=>!e.cad||e.cad<156), 'Cad <156 en 3 seguidos puede indicar fatiga neuromuscular')}
         ${alertRow('T.suelo subiendo', !!(last.ts&&E[E.length-2]?.ts&&last.ts>E[E.length-2].ts+8), 'Aumento brusco de t.suelo = pérdida de reactividad')}
       </div>
     </div>
@@ -5038,7 +5045,7 @@ const GLOSSARY = {
   'IL-6': {title:'IL-6 — Interleucina 6', body:'Citoquina proinflamatoria liberada durante el ejercicio intenso. Facilita la recuperación y adaptación muscular, pero niveles crónicamente altos indican sobrecarga. Base de muchos estudios de fisiología del ejercicio.'},
   'umbral': {title:'Umbral anaeróbico / láctico', body:'Intensidad a la que el lactato se acumula más rápido de lo que el cuerpo puede eliminarlo. Entrenar justo por debajo es la forma más eficaz de mejorar el ritmo de carrera. Corresponde aproximadamente a Z4.'},
   'lactato': {title:'Lactato / Ácido láctico', body:'Producto del metabolismo anaeróbico. A partir del umbral láctico, se acumula y provoca la fatiga muscular conocida. Entrenamiento específico en Z3-Z4 sube el umbral, permitiéndote ir más rápido antes de acumularlo.'},
-  'cadencia': {title:'Cadencia de carrera', body:'Número de pasos por minuto (contando ambos pies). Para tu altura (193cm) el rango ideal es 158-165 p/min. Una cadencia más alta reduce el impacto en rodilla y mejora la eficiencia. Subir 5-10% progresivamente.'},
+  'cadencia': {title:'Cadencia de carrera', body:`Número de pasos por minuto (contando ambos pies). ${S.athlete.altura?`Para tu altura (${S.athlete.altura}cm) el rango ideal es ${CI.min}-${CI.max} p/min.`:'El rango ideal depende de tu altura (normalmente entre 158 y 172 p/min).'} Una cadencia más alta reduce el impacto en rodilla y mejora la eficiencia. Subir 5-10% progresivamente.`},
   'zancada': {title:'Longitud de zancada', body:'Distancia recorrida por cada ciclo completo (dos apoyos). Para corredores altos tiende a ser más larga naturalmente. Una zancada excesivamente larga con el pie delante del cuerpo (overstriding) aumenta el riesgo de lesión.'},
   'tapering': {title:'Tapering — Afinamiento precompetición', body:'Reducción controlada del volumen de entrenamiento en los 7-14 días previos a una carrera importante. Se mantiene la intensidad pero se reduce el volumen un 30-50%. El objetivo es llegar con las piernas frescas y el sistema nervioso recuperado.'},
   'fartlek': {title:'Fartlek — Juego de velocidades', body:'Entrenamiento sueco que combina cambios de ritmo de forma libre o estructurada dentro de un rodaje. Ej: 1 min rápido, 2 min suave, 30s sprint, 3 min suave. Muy eficaz para mejorar el umbral y la potencia aeróbica sin la rigidez de las series.'},
@@ -6718,7 +6725,7 @@ function renderPlanes(el){
     </div>
   `:`
     <div style="display:flex;flex-direction:column;gap:.75rem">
-      ${planes.map((p,i)=>planCard(p,i)).join('')}
+      ${planes.map((p,i)=>i).sort((a,b)=>new Date(planes[b].fecha)-new Date(planes[a].fecha)).map(i=>planCard(planes[i],i)).join('')}
     </div>
   `}`;
 }
@@ -7099,7 +7106,7 @@ function renderPerfil(el){
     <div style="font-size:13px;color:var(--text2);line-height:1.9">
       Para <strong style="color:var(--text)">${a.altura}cm</strong> de altura, la zancada natural es más larga → necesitas menos pasos por minuto.<br>
       🎯 Rango: <strong style="color:var(--c-cad)">${CI.min}–${CI.max} p/min</strong> &nbsp;·&nbsp; Óptimo: <strong style="color:var(--acc)">${CI.opt} p/min</strong><br>
-      Tu mejor registrada: <strong style="color:var(--acc)">${Math.max(...S.entrenamientos.filter(e=>e.cad).map(e=>e.cad))} p/min</strong><br><br>
+      Tu mejor registrada: <strong style="color:var(--acc)">${(()=>{const v=S.entrenamientos.filter(e=>e.cad).map(e=>e.cad);return v.length?Math.max(...v)+' p/min':'Sin datos aún';})()}</strong><br><br>
       Cadencias &gt;170 para tu estatura implican zancada demasiado corta y pérdida de eficiencia. La evidencia (Heiderscheit et al., 2011) muestra que un aumento del 5-10% en cadencia reduce la carga articular en rodilla y cadera.
     </div>
   </div>
@@ -7677,7 +7684,7 @@ function disconnectApi(){
 function resetAllData(){
   appConfirm('⚠️ BORRAR TODOS LOS DATOS','Se eliminarán <strong style="color:var(--text)">todos</strong> tus entrenamientos, eventos, planes y equipación de este dispositivo.<br><br>Exporta antes un backup si quieres conservarlos. Esta acción no se puede deshacer.','BORRAR TODO',()=>{
     localStorage.removeItem(SK);
-    S=defState();
+    S=load();
     save();
     go('dash');
     showToast('Datos borrados','var(--acc3)');
@@ -7772,7 +7779,7 @@ function exportDemo(){
   // Embed demo state into a fresh copy of this HTML file
   const html=document.documentElement.outerHTML;
   // Replace the localStorage load with inline demo data injection
-  const demoScript=`\n<script>\n(function(){\n  var SK='stride_v2';\n  var demoData=${JSON.stringify({_stride_version:2,_exported:new Date().toISOString(),_description:'Locorunner Demo',data:demoState})};\n  try{ if(!localStorage.getItem(SK)){ localStorage.setItem(SK,JSON.stringify(demoData.data)); } }catch(e){}\n})();\n<\/script>\n`;
+  const demoScript=`\n<script>\n(function(){\n  var SK='stride_v2_b';\n  var demoData=${JSON.stringify({_stride_version:2,_exported:new Date().toISOString(),_description:'Locorunner Demo',data:demoState})};\n  try{ if(!localStorage.getItem(SK)){ localStorage.setItem(SK,JSON.stringify(demoData.data)); } }catch(e){}\n})();\n<\/script>\n`;
   const demoHtml=html.replace('</head>',demoScript+'</head>');
 
   const blob=new Blob([demoHtml],{type:'text/html'});
