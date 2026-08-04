@@ -81,6 +81,9 @@
   --tt-gimnasio: #a78bfa;
   --tt-tecnica:  #38bdf8;
   --tt-descanso: #8890a0;
+  --tt-ciclismo: #fb923c;
+  --tt-padel:    #2dd4bf;
+  --tt-otros:    #64748b;
 }
 [data-theme="light"]{
   --bg:#f4f6fb;--bg2:#ffffff;--bg3:#eef0f7;--bg4:#e4e8f2;
@@ -93,6 +96,7 @@
   --c-ritmo:#0284c7;--c-fc:#c2410c;--c-hrv:#4338ca;--c-vo2:#047857;
   --tt-carrera:#dc2626;--tt-calidad:#c2410c;--tt-rodaje:#15803d;
   --tt-gimnasio:#7c3aed;--tt-tecnica:#0284c7;--tt-descanso:#4b5563;
+  --tt-ciclismo:#c2410c;--tt-padel:#0d9488;--tt-otros:#475569;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;height:100dvh;overflow:hidden;max-width:100vw}
@@ -569,7 +573,7 @@ function save(){
 function updateBadge(){
   const b=document.getElementById('planesBadge');
   if(b){
-    const n=(S.planes||[]).filter(p=>!p.completado&&!p.noRealizado).length;
+    const n=(S.planes||[]).filter(p=>!p.completado&&!p.noRealizado&&!p.esDescanso).length;
     b.textContent=n>0?n:'';b.style.display=n>0?'':'none';
   }
   const eb=document.getElementById('eventsBadge');
@@ -2093,6 +2097,68 @@ function buildWeekPanelSimple(E){
 }
 
 /* ============================================================
+   ACTIVIDAD CRUZADA (GYM / BIKE / PÁDEL / OTROS)
+   Barras apiladas por semana (últimas 8) + contador de sesiones por
+   categoría. Excluye Running/Trail — esos ya tienen su propio bloque
+   de volumen en "Esta semana" y "Km por mes". Usa grupoDeporte(),
+   la misma clasificación que detectPRsFromEntrenos/proyectarCarrera.
+============================================================ */
+const CROSS_TRAINING_CATS=[
+  {key:'Gimnasio',label:'Gimnasio',color:'var(--tt-gimnasio)',icon:'🏋️'},
+  {key:'Ciclismo',label:'Ciclismo',color:'var(--tt-ciclismo)',icon:'🚴'},
+  {key:'Pádel',label:'Pádel/Tenis',color:'var(--tt-padel)',icon:'🎾'},
+  {key:'Otros',label:'Otros',color:'var(--tt-otros)',icon:'⚡'},
+];
+
+function buildCrossTrainingPanel(E){
+  const cross=E.filter(e=>grupoDeporte(e.deporte)!=='Running');
+  if(!cross.length) return '';
+
+  const today=hoy();
+  const daysFromMonday=(today.getDay()+6)%7;
+  const thisMonday=new Date(today); thisMonday.setDate(today.getDate()-daysFromMonday);
+
+  // Últimas 8 semanas (más antigua primero), cada una lunes-domingo
+  const semanasReal=[];
+  for(let i=7;i>=0;i--){
+    const wStart=new Date(thisMonday); wStart.setDate(thisMonday.getDate()-i*7);
+    const wEnd=new Date(wStart); wEnd.setDate(wStart.getDate()+6);
+    const ents=cross.filter(e=>{const d=parseISO(e.fecha);return d>=wStart&&d<=wEnd;});
+    const porCat={};
+    CROSS_TRAINING_CATS.forEach(c=>{porCat[c.key]=ents.filter(e=>grupoDeporte(e.deporte)===c.key).length;});
+    semanasReal.push({wStart,label:`${wStart.getDate()}/${wStart.getMonth()+1}`,porCat,total:ents.length});
+  }
+
+  const maxTotal=Math.max(...semanasReal.map(s=>s.total),1);
+  const totales={};
+  CROSS_TRAINING_CATS.forEach(c=>{totales[c.key]=cross.filter(e=>grupoDeporte(e.deporte)===c.key).length;});
+
+  return`<div class="cbox">
+    <div class="cbox-title">Actividad cruzada · últimas 8 semanas</div>
+    <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:.4rem;align-items:end;height:110px;margin-bottom:.85rem">
+      ${semanasReal.map(s=>`
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%">
+        <div style="width:100%;display:flex;flex-direction:column-reverse;height:80px;justify-content:flex-start;border-radius:4px 4px 0 0;overflow:hidden">
+          ${s.total===0?`<div style="width:100%;height:4px;background:var(--bg4)"></div>`:CROSS_TRAINING_CATS.filter(c=>s.porCat[c.key]>0).map(c=>`
+          <div style="width:100%;height:${Math.max(6,Math.round((s.porCat[c.key]/maxTotal)*80))}px;background:${c.color}" title="${c.label}: ${s.porCat[c.key]}"></div>`).join('')}
+        </div>
+        <div style="font-size:9px;color:var(--text3)">${s.label}</div>
+      </div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.5rem">
+      ${CROSS_TRAINING_CATS.map(c=>`
+      <div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border-radius:var(--r2);padding:.5rem .65rem">
+        <span style="font-size:15px">${c.icon}</span>
+        <div>
+          <div style="font-family:'Bebas Neue';font-size:16px;color:${c.color};line-height:1">${totales[c.key]}</div>
+          <div style="font-size:9px;color:var(--text3)">${c.label}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ============================================================
    PROYECCIÓN DINÁMICA DE TIEMPO EN CARRERA
    Se recalcula con cada entreno nuevo: si mejoras, la proyección mejora.
    Método: fórmula de Riegel (T2 = T1 · (D2/D1)^1.06) aplicada al mejor
@@ -2115,10 +2181,11 @@ function proyectarCarrera(distKm, desnivel){
   if(!distKm||!E.length)return null;
 
   const hoyD=hoy();
-  // Referencias: entrenos de los últimos 90 días con al menos 4km
+  // Referencias: entrenos de los últimos 90 días con al menos 4km, excluyendo deportes
+  // cuyo ritmo no es comparable al de una carrera a pie (bici, natación, pádel, etc.)
   const refs=E.filter(e=>{
     const d=parseISO(e.fecha);
-    return e.dist>=4 && e.secs>0 && (hoyD-d)/86400000<=90;
+    return esDeporteConRitmo(e.deporte) && e.dist>=4 && e.secs>0 && (hoyD-d)/86400000<=90;
   });
   if(!refs.length)return null;
 
@@ -2137,8 +2204,9 @@ function proyectarCarrera(distKm, desnivel){
   if(desnivel&&desnivel>0) base+=(desnivel/100)*8;
 
   // Tendencia de forma: comparar ritmo medio de los últimos 21 días vs los 21 anteriores
+  // (solo entrenos con ritmo comparable, mismo criterio que las referencias de arriba)
   const ritmoMedio=(desde,hasta)=>{
-    const f=E.filter(e=>{const dd=(hoyD-parseISO(e.fecha))/86400000;return dd>=hasta&&dd<desde&&e.ritmo;});
+    const f=E.filter(e=>{const dd=(hoyD-parseISO(e.fecha))/86400000;return esDeporteConRitmo(e.deporte)&&dd>=hasta&&dd<desde&&e.ritmo;});
     return f.length?f.reduce((a,e)=>a+e.ritmo,0)/f.length:null;
   };
   const rReciente=ritmoMedio(21,0), rPrevio=ritmoMedio(42,21);
@@ -2326,9 +2394,9 @@ function dailyMsgContext(){
   const wStart=new Date(today); wStart.setDate(today.getDate()-((today.getDay()+6)%7));
   const kmSem=E.filter(e=>parseISO(e.fecha)>=wStart&&parseISO(e.fecha)<=today).reduce((a,e)=>a+e.dist,0);
   const diasSinCorrer = last ? diasEntre(last.fecha, hoyISO()) : 999;
-  // Tendencia (reusa la lógica de proyección: ritmo reciente vs previo)
+  // Tendencia (reusa la lógica de proyección: ritmo reciente vs previo, solo deportes con ritmo comparable)
   let tendencia=0;
-  const ritmoMedio=(desde,hasta)=>{const f=E.filter(e=>{const dd=diasEntre(e.fecha,hoyISO());return dd>=hasta&&dd<desde&&e.ritmo;});return f.length?f.reduce((a,e)=>a+e.ritmo,0)/f.length:null;};
+  const ritmoMedio=(desde,hasta)=>{const f=E.filter(e=>{const dd=diasEntre(e.fecha,hoyISO());return esDeporteConRitmo(e.deporte)&&dd>=hasta&&dd<desde&&e.ritmo;});return f.length?f.reduce((a,e)=>a+e.ritmo,0)/f.length:null;};
   const rR=ritmoMedio(21,0), rP=ritmoMedio(42,21);
   if(rR&&rP) tendencia=(rP-rR)/rP;
 
@@ -2343,6 +2411,7 @@ function dailyMsgContext(){
   // Descriptor corto del plan (tipo o título) para las plantillas
   const planDesc=(p)=>{
     if(!p) return '';
+    if(p.esDescanso) return 'descanso';
     const t=(p.contenido||'').match(/\*\*Tipo:\*\*\s*([^\n|]+)/);
     if(t&&t[1].trim()) return t[1].trim().toLowerCase();
     const h=(p.contenido||'').match(/##\s*🎯\s*ENTRENAMIENTO DE HOY\s*[—-]\s*([^\n]+)/i);
@@ -2545,6 +2614,8 @@ function renderDash(el){
         <div class="cbox-title">Km por mes · ${new Date().getFullYear()}</div>
         <canvas id="cKmMes" style="max-height:210px"></canvas>
       </div>
+      <!-- 2b. ACTIVIDAD CRUZADA (GYM/BIKE/PÁDEL/OTROS) -->
+      ${buildCrossTrainingPanel(E)}
       <!-- 3. OBJETIVO ANUAL -->
       <div class="cbox">
         <div class="cbox-title">Objetivo anual de km</div>
@@ -2650,6 +2721,28 @@ function saveKmGoal(){
 ============================================================ */
 const DEPORTES_LISTA = ['Running','Ciclismo','Natación','Fuerza / Gimnasio','Senderismo','Trail','Fútbol','Baloncesto','Tenis / Pádel','Yoga / Pilates','Esquí / Snowboard','Remo','Otro'];
 
+// Deportes cuyo ritmo/tiempo es comparable al de una carrera a pie (Running y Trail:
+// ambos se corren, aunque el terreno cambie el ritmo). El resto (bici, natación, pádel...)
+// tiene métricas de velocidad/tiempo no comparables y debe excluirse de PRs y proyecciones.
+// Los entrenos antiguos sin campo `deporte` (antes de introducirlo) se tratan como Running
+// por compatibilidad — todos eran de running en esa época.
+const DEPORTES_RITMO_VALIDO = ['Running', 'Trail'];
+function esDeporteConRitmo(deporte) {
+  if (!deporte) return true;
+  return DEPORTES_RITMO_VALIDO.includes(deporte);
+}
+
+// Agrupa un deporte en la categoría usada para gráficos/contadores del dashboard.
+// Running y Trail se cuentan como "Running" (comparten el mismo propósito de entreno);
+// el resto de deportes registrados manualmente o vía FIT se agrupan por tipo.
+function grupoDeporte(deporte) {
+  if (!deporte || deporte === 'Running' || deporte === 'Trail') return 'Running';
+  if (deporte === 'Fuerza / Gimnasio') return 'Gimnasio';
+  if (deporte === 'Ciclismo') return 'Ciclismo';
+  if (deporte === 'Tenis / Pádel') return 'Pádel';
+  return 'Otros';
+}
+
 const PR_DISTANCES = [
   { key:'5k',   label:'5K',            minKm:4.8,  maxKm:5.5,  color:'var(--acc2)',  icon:'⚡' },
   { key:'10k',  label:'10K',           minKm:9.5,  maxKm:10.8, color:'var(--c-cad)', icon:'🔥' },
@@ -2659,8 +2752,9 @@ const PR_DISTANCES = [
 
 function detectPRsFromEntrenos(E){
   const prs={};
+  const Erun=E.filter(e=>esDeporteConRitmo(e.deporte));
   PR_DISTANCES.forEach(d=>{
-    const candidates=E.filter(e=>
+    const candidates=Erun.filter(e=>
       e.dist>=d.minKm && e.dist<=d.maxKm &&
       e.secs && e.secs>0 &&
       (e.tipo?.toLowerCase().includes('carrera')||
@@ -2848,11 +2942,24 @@ function renderCalendario(el){
   const months7=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   const monthsFull=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  // Map events and entrenos by date string
+  // Map events and entrenos by date string. planByDate incluye TODOS los planes
+  // (pendientes, completados y descansos) — antes solo se guardaban los pendientes,
+  // así que un plan de gimnasio marcado como hecho desaparecía del calendario sin
+  // dejar ningún rastro (no genera un entrenamiento real en S.entrenamientos).
   const evByDate={}, entByDate={}, planByDate={};
   eventos.forEach(e=>{ if(!evByDate[e.fecha])evByDate[e.fecha]=[]; evByDate[e.fecha].push(e); });
   S.entrenamientos.forEach(e=>{ if(!entByDate[e.fecha])entByDate[e.fecha]=[]; entByDate[e.fecha].push(e); });
-  (S.planes||[]).forEach(p=>{ if(p.fecha&&!p.completado){ if(!planByDate[p.fecha])planByDate[p.fecha]=[]; planByDate[p.fecha].push(p); } });
+  (S.planes||[]).forEach(p=>{ if(p.fecha){ if(!planByDate[p.fecha])planByDate[p.fecha]=[]; planByDate[p.fecha].push(p); } });
+
+  // Clasifica los planes de un día en las 3 categorías que se muestran en el calendario
+  function clasificarPlanesDia(ds, hasEnt){
+    const dayPlans=planByDate[ds]||[];
+    return{
+      pendiente: !hasEnt && dayPlans.some(p=>!p.completado&&!p.esDescanso),
+      completado: !hasEnt && dayPlans.some(p=>p.completado&&!p.esDescanso),
+      descanso: !hasEnt && dayPlans.some(p=>!p.completado&&p.esDescanso),
+    };
+  }
 
   // Next 7 days entrenos planned (from planes)
   const next7Plans=[];
@@ -2892,13 +2999,14 @@ function renderCalendario(el){
           const hasEv=evByDate[ds];
           const hasEnt=entByDate[ds];
           const isPast=new Date(ds+'T00:00:00')<today;
-          // Check for future planned sessions from S.planes
-          const hasPlan=!hasEnt&&(S.planes||[]).some(p=>p.fecha===ds&&!p.completado);
+          const planEstado=clasificarPlanesDia(ds,hasEnt);
           return`<div class="cal-day" onclick="calDayClick('${ds}')" style="background:${isToday?'var(--acc)15':'var(--bg3)'};border:1.5px solid ${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}" onmouseover="this.style.borderColor='var(--acc2)50'" onmouseout="this.style.borderColor='${isToday?'var(--acc)':hasEv?'var(--acc3)50':hasEnt?'var(--acc2)20':'var(--border)'}'">
             <div class="cal-day-num" style="font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':isPast?'var(--text3)':'var(--text)'}">${day}</div>
             ${hasEnt?`<div class="cal-day-badge" style="background:var(--acc2)25;color:var(--acc2)">${hasEnt[0].dist}km</div>`:''}
             ${hasEv?hasEv.map(ev=>`<div class="cal-day-badge" style="background:var(--acc3)25;color:var(--acc3)">🏁 ${esc(ev.nombre.split(' ')[0])}</div>`).join(''):''}
-            ${hasPlan?`<div class="cal-day-badge" style="background:var(--acc4)20;color:var(--acc4)">⚡ plan</div>`:''}
+            ${planEstado.pendiente?`<div class="cal-day-badge" style="background:var(--acc4)20;color:var(--acc4)">⚡ plan</div>`:''}
+            ${planEstado.completado?`<div class="cal-day-badge" style="background:var(--acc)20;color:var(--acc)">✓ hecho</div>`:''}
+            ${planEstado.descanso?`<div class="cal-day-badge" style="background:var(--tt-descanso)20;color:var(--tt-descanso)">💤 descanso</div>`:''}
           </div>`;
         }).join('')}
       </div>
@@ -2908,6 +3016,8 @@ function renderCalendario(el){
         <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--acc2);border-radius:3px;display:inline-block"></span>Entrenamiento</span>
         <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--acc3);border-radius:3px;display:inline-block"></span>Carrera/Evento</span>
         <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--acc4);border-radius:3px;display:inline-block"></span>Plan pendiente</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--acc);border-radius:3px;display:inline-block"></span>Plan completado</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--tt-descanso);border-radius:3px;display:inline-block"></span>Descanso</span>
         <span style="display:flex;align-items:center;gap:6px"><span style="width:13px;height:13px;background:var(--acc)15;border:2px solid var(--acc);border-radius:3px;display:inline-block"></span>Hoy</span>
       </div>
     </div>
@@ -2960,9 +3070,13 @@ function renderCalendario(el){
               ${ents.map(e=>`<div style="font-size:11px;color:var(--acc2);background:var(--acc2)15;border-radius:4px;padding:2px 6px;margin-bottom:2px;cursor:pointer" onclick="openTrain(${e.id})">${e.tipo} ${e.dist}km</div>`).join('')}
               ${evs.map(e=>`<div style="font-size:11px;color:var(--acc3);background:var(--acc3)15;border-radius:4px;padding:2px 6px;margin-bottom:2px">🏁 ${esc(e.nombre)}</div>`).join('')}
               ${plans.map(p=>{
+                if(p.esDescanso){
+                  return`<div style="font-size:11px;color:var(--tt-descanso);background:var(--tt-descanso)15;border-radius:4px;padding:2px 6px;margin-bottom:2px">💤 Descanso</div>`;
+                }
                 const titleMatch=(p.contenido||'').match(/##\s*🎯\s*ENTRENAMIENTO DE HOY[^\n]*\n/);
                 const ptitle=titleMatch?titleMatch[0].replace(/##\s*🎯\s*ENTRENAMIENTO DE HOY\s*[—-]?\s*/,'').trim():'Plan generado';
-                return`<div style="font-size:11px;color:var(--acc4);background:var(--acc4)15;border-radius:4px;padding:2px 6px;margin-bottom:2px;cursor:pointer" onclick="go('planes')">⚡ ${ptitle}</div>`;
+                const hecho=p.completado;
+                return`<div style="font-size:11px;color:${hecho?'var(--acc)':'var(--acc4)'};background:${hecho?'var(--acc)15':'var(--acc4)15'};border-radius:4px;padding:2px 6px;margin-bottom:2px;cursor:pointer" onclick="go('planes')">${hecho?'✓':'⚡'} ${ptitle}</div>`;
               }).join('')}
               ${!ents.length&&!evs.length&&!plans.length?`<div style="font-size:10px;color:var(--text3)">Sin actividad</div>`:''}
             </div>
@@ -2983,7 +3097,8 @@ function calNav(dir){
 function calDayClick(dateStr){
   const evs=(S.eventos||[]).filter(e=>e.fecha===dateStr);
   const ents=S.entrenamientos.filter(e=>e.fecha===dateStr);
-  const plans=(S.planes||[]).filter(p=>p.fecha===dateStr&&!p.completado);
+  const plans=(S.planes||[]).filter(p=>p.fecha===dateStr&&!p.completado&&!p.esDescanso);
+  const soloDescanso=!plans.length&&(S.planes||[]).some(p=>p.fecha===dateStr&&!p.completado&&p.esDescanso);
 
   if(ents.length===1){
     // Go directly to training analysis
@@ -3018,6 +3133,11 @@ function calDayClick(dateStr){
   }
   if(plans.length){
     go('planes');
+    return;
+  }
+  if(soloDescanso){
+    // Día de descanso planificado — no hay nada que abrir en "Mis Planes"
+    showToast('💤 Día de descanso planificado','var(--tt-descanso)');
     return;
   }
   // Día vacío — menú propio de la app (sin diálogos nativos del navegador)
@@ -5542,7 +5662,7 @@ Responde en español, de forma clara y accesible (no excesivamente técnica). M�
   }
 }
 
-function aiMsg(text, isWorkoutAnalysis, skipCitations){
+function aiMsg(text, isWorkoutAnalysis, skipCitations, skipPlanSave){
   const m=document.getElementById('cmsgs'); if(!m)return;
   const d=document.createElement('div');d.className='msg-a';
   const formatted = processAiText(text, skipCitations);
@@ -5564,10 +5684,104 @@ function aiMsg(text, isWorkoutAnalysis, skipCitations){
       </button>
     </div>` : '';
 
-  d.innerHTML=`<div class="bub">${formatted}${scienceBtns}</div><div class="mt">LOCORUNNER IA · ${now()}</div>`;
+  // Detecta si la respuesta libre del coach contiene un plan de varios días
+  // (p.ej. el usuario pidió "dame el plan de la semana" charlando normal, sin
+  // pasar por el flujo guiado). Si es así, ofrecemos guardarlo en Planes/Calendario
+  // sin gastar una llamada extra a la API — se parsea el texto que ya tenemos.
+  const savePlanBtn = !skipPlanSave && looksLikeWeeklyPlan(text) ? `
+    <div style="margin-top:12px">
+      <button onclick="offerSaveWeeklyPlanFromChat(${msgIdx},this)" style="background:var(--acc4)15;border:1.5px solid var(--acc4)40;border-radius:20px;padding:6px 14px;color:var(--acc4);font-size:11px;cursor:pointer;font-family:'Inter';display:flex;align-items:center;gap:6px" onmouseover="this.style.background='var(--acc4)25'" onmouseout="this.style.background='var(--acc4)15'">
+        💾 Guardar este plan en Mis Planes / Calendario
+      </button>
+    </div>` : '';
+
+  d.innerHTML=`<div class="bub">${formatted}${scienceBtns}${savePlanBtn}</div><div class="mt">LOCORUNNER IA · ${now()}</div>`;
   m.appendChild(d);
   setTimeout(()=>d.scrollIntoView({behavior:'smooth',block:'start'}),50);
 }
+
+/* ============================================================
+   GUARDAR PLAN SEMANAL DETECTADO EN CHAT LIBRE (sin gastar API)
+   Si el coach responde en la conversación normal con un plan de varios
+   días (no a través del flujo guiado "GENERAR ENTRENAMIENTO"), lo
+   detectamos y ofrecemos trasladarlo a Planes/Calendario reutilizando
+   el texto que ya tenemos — sin volver a llamar a la IA.
+============================================================ */
+function quitarAcentos(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+const DIAS_SEMANA_NOMBRES=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+function looksLikeWeeklyPlan(text){
+  if(!text) return false;
+  const re=/(?:^|\n)\s*#{0,3}\s*(LUNES|MARTES|MI[EÉ]RCOLES|JUEVES|VIERNES|S[AÁ]BADO|DOMINGO)\b/gi;
+  const found=new Set();
+  let m;
+  while((m=re.exec(text))){ found.add(quitarAcentos(m[1]).toUpperCase()); }
+  return found.size>=3;
+}
+
+// Mapa día-de-la-semana → fecha, para los próximos 7 días a partir de hoy
+// (primera ocurrencia de cada nombre = la más próxima). Igual criterio que runWeekPlanFlow.
+function mapaDiasSemanaProxima(){
+  const today=new Date();
+  const map={};
+  for(let i=0;i<7;i++){
+    const d=new Date(today); d.setDate(today.getDate()+i);
+    const name=DIAS_SEMANA_NOMBRES[(d.getDay()+6)%7];
+    if(!(name in map)) map[name]=isoLocal(d);
+  }
+  return map;
+}
+
+function parseWeeklyPlanFromText(text){
+  const fechas=mapaDiasSemanaProxima();
+  const boundary=DIAS_SEMANA_NOMBRES.map(d=>quitarAcentos(d).toUpperCase()).join('|');
+  const results=[];
+  DIAS_SEMANA_NOMBRES.forEach(day=>{
+    const dayUp=quitarAcentos(day).toUpperCase();
+    const re=new RegExp(`(?:^|\\n)\\s*#{0,3}\\s*${dayUp}[^\\n]*\\n([\\s\\S]*?)(?=\\n\\s*#{0,3}\\s*(?:${boundary})\\b|\\n#{1,3}\\s*📊|$)`,'i');
+    const match=text.match(re);
+    if(match && match[1].trim().length>5){
+      const contenido=match[1].trim();
+      results.push({dia:day, fecha:fechas[day], contenido, esDescanso:/^\s*DESCANSO/i.test(contenido)});
+    }
+  });
+  return results;
+}
+
+function offerSaveWeeklyPlanFromChat(msgIdx, btn){
+  const text=(window._aiMsgTexts||[])[msgIdx]||'';
+  const dias=parseWeeklyPlanFromText(text);
+  if(!dias.length){
+    showToast('No he podido identificar sesiones por día en este mensaje','var(--acc3)');
+    return;
+  }
+  appConfirm(
+    '📅 GUARDAR PLAN SEMANAL',
+    `He detectado ${dias.length} sesión${dias.length!==1?'es':''} en este plan (${dias.map(d=>d.dia).join(', ')}). ¿Las guardo en Mis Planes / Calendario? No hace falta volver a preguntarle a ${coachNombre()}, uso el texto que ya tenemos.`,
+    'GUARDAR',
+    ()=>saveWeeklyPlanFromChat(dias,btn),
+    'var(--acc4)'
+  );
+}
+
+function saveWeeklyPlanFromChat(dias, btn){
+  if(!S.planes) S.planes=[];
+  dias.forEach((d,i)=>{
+    S.planes.unshift({
+      id:Date.now()+i,
+      fecha:d.fecha,
+      tipo:'semanal',
+      contenido:d.contenido,
+      esDescanso:d.esDescanso,
+      sensaciones:{},
+      completado:false
+    });
+  });
+  save();
+  if(btn){ btn.disabled=true; btn.style.opacity='.5'; btn.innerHTML='✅ Guardado en Mis Planes'; }
+  showToast(`${dias.length} sesiones guardadas en Mis Planes`,'var(--acc4)');
+}
+
 
 function showStudies(msgIdx, btn){
   btn.closest('.science-btns').style.display='none';
@@ -6091,6 +6305,7 @@ function buildSys(){
 
   // Entrenos planificados pendientes (hoy y futuros, no completados)
   const planDescShort=(p)=>{
+    if(p.esDescanso) return 'Descanso';
     const t=(p.contenido||'').match(/\*\*Tipo:\*\*\s*([^\n|]+)/);
     if(t&&t[1].trim()) return t[1].trim();
     const h=(p.contenido||'').match(/##\s*🎯\s*ENTRENAMIENTO DE HOY\s*[—-]\s*([^\n]+)/i);
@@ -6342,11 +6557,51 @@ function getNextEvents(){
 /* ============================================================
    PLAN SEMANAL
 ============================================================ */
-async function startWeekPlanFlow(){
+function startWeekPlanFlow(){
   if(!requireDataForAI({needsWorkouts:true})) return;
-  const apiKey=getApiKey();
   go('chat');
-  await new Promise(r=>setTimeout(r,200));
+  setTimeout(()=>showWeekStartQuestion(),200);
+}
+
+// Antes de generar el plan semanal, preguntamos si empieza hoy o mañana —
+// y si detectamos que hoy ya hay un entreno registrado o un plan pendiente
+// para hoy, lo decimos explícitamente para que la elección tenga contexto.
+function showWeekStartQuestion(){
+  const todayStr=hoyISO();
+  const entHoy=(S.entrenamientos||[]).filter(e=>e.fecha===todayStr);
+  const planHoy=(S.planes||[]).find(p=>p.fecha===todayStr&&!p.completado&&!p.noRealizado);
+  let contextMsg;
+  if(entHoy.length){
+    contextMsg=`Veo que hoy ya has entrenado (${esc(entHoy[0].tipo)} · ${entHoy[0].dist}km). ¿El plan semanal empieza hoy (contando ya esa sesión) o mañana?`;
+  } else if(planHoy){
+    contextMsg=`Ya tienes un plan pendiente para hoy. ¿Empezamos la semana nueva desde hoy (sustituye al de hoy) o desde mañana (respeta el de hoy)?`;
+  } else {
+    contextMsg=`¿Quieres que el plan semanal empiece hoy o mañana?`;
+  }
+  const msgs=document.getElementById('cmsgs'); if(!msgs)return;
+  const d=document.createElement('div');
+  d.className='msg-a';
+  d.id='weekStartQ';
+  d.innerHTML=`
+    <div class="bub">
+      <div style="margin-bottom:8px;font-weight:600">📅 ${contextMsg}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="answerWeekStart(0,this)" style="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;color:var(--text2);font-size:12px;cursor:pointer;font-family:'Inter';transition:all .15s" onmouseover="this.style.borderColor='var(--acc4)';this.style.color='var(--acc4)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">Empezar HOY</button>
+        <button onclick="answerWeekStart(1,this)" style="background:var(--bg4);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;color:var(--text2);font-size:12px;cursor:pointer;font-family:'Inter';transition:all .15s" onmouseover="this.style.borderColor='var(--acc4)';this.style.color='var(--acc4)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">Empezar MAÑANA</button>
+      </div>
+    </div>
+    <div class="mt">LOCORUNNER IA · plan semanal</div>`;
+  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
+}
+function answerWeekStart(offset,btn){
+  const qDiv=document.getElementById('weekStartQ');
+  if(qDiv) qDiv.querySelectorAll('button').forEach(b=>{b.style.cursor='default';b.style.opacity='0.5';b.onclick=null;});
+  if(btn){btn.style.background='var(--acc4)30';btn.style.borderColor='var(--acc4)';btn.style.color='var(--acc4)';btn.style.opacity='1';}
+  setTimeout(()=>runWeekPlanFlow(offset),300);
+}
+
+async function runWeekPlanFlow(startOffset){
+  const apiKey=getApiKey();
 
   const typing=addTyping('Diseñando tu plan semanal completo…');
   showCoachWorking('el entrenamiento semanal completo');
@@ -6355,9 +6610,13 @@ async function startWeekPlanFlow(){
   const todayStr=isoLocal(today);
   const days=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
-  // Build next 7 days with their dates
+  // El plan puede empezar hoy o mañana según lo elegido en showWeekStartQuestion
+  const startDate=new Date(today); startDate.setDate(today.getDate()+startOffset);
+  const startDateStr=isoLocal(startDate);
+
+  // Build week days starting from startDate
   const week=Array.from({length:7},(_,i)=>{
-    const d=new Date(today); d.setDate(today.getDate()+i);
+    const d=new Date(startDate); d.setDate(startDate.getDate()+i);
     return {date:isoLocal(d), day:days[(d.getDay()+6)%7], idx:i};
   });
 
@@ -6384,10 +6643,18 @@ async function startWeekPlanFlow(){
   const lastTrainLabel=daysSinceW===null?'sin datos':daysSinceW===0?'HOY':daysSinceW===1?'AYER':daysSinceW+' días atrás';
   const lastTrainInfo=lastTrain?`${lastTrain.fecha} (${lastTrainLabel}) · ${lastTrain.tipo} · ${lastTrain.dist}km a ${fmt(lastTrain.ritmo)}/km`:'ninguno';
 
-  const weekPrompt=`Genera el plan de entrenamiento completo para los próximos 7 días (${todayStr} al ${week[6].date}).
+  // Si el plan empieza hoy y ya hay un entreno registrado hoy, que el coach lo sepa
+  // explícitamente (para no duplicar sesión el mismo día)
+  const entHoy=(S.entrenamientos||[]).filter(e=>e.fecha===todayStr);
+  const avisoHoy = startOffset===0 && entHoy.length
+    ? `\n⚠️ Hoy (${todayStr}) ya hay un entreno registrado (${entHoy[0].tipo} · ${entHoy[0].dist}km) — al planificar el primer día de la semana (hoy), tenlo en cuenta y no dupliques la sesión de hoy.`
+    : '';
+
+  const weekPrompt=`Genera el plan de entrenamiento completo para los próximos 7 días, empezando ${startOffset===0?'HOY':'MAÑANA'} (${week[0].date} al ${week[6].date}).
 
 CONTEXTO:
 - Hoy es: ${fechaLarga(hoyISO())} (${todayStr})
+- El plan empieza: ${startOffset===0?'HOY mismo':'MAÑANA'} (${week[0].date})${avisoHoy}
 
 ⛔ FECHAS — usa SOLO esta correspondencia, no la recalcules:
 ${tablaProximosDias(8)}
@@ -6441,27 +6708,32 @@ ${week.map(w=>`### ${w.day.toUpperCase()} ${fmtD(w.date)}
     const reply=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n\n')||'Sin respuesta.';
     typing?.remove();
     hideCoachWorking();
-    aiMsg(reply);
+    aiMsg(reply,false,false,true); // skipPlanSave: ya lo guardamos nosotros abajo, no ofrecer el botón de detección
     S.chatHistory.push({role:'assistant',content:reply});
 
-    // Save each day as individual plan
+    // Save each day as individual plan — incluyendo los días de descanso (con
+    // esDescanso:true) para que el Calendario pueda mostrarlos; se ocultan de
+    // "Mis Planes" (ver renderPlanes) para no ensuciar esa lista con descansos.
     if(!S.planes) S.planes=[];
-    let saved=0;
+    let saved=0, savedRest=0;
     week.forEach(w=>{
       // Extract day section from reply
       const dayRegex=new RegExp(`###\\s*${w.day.toUpperCase()}[^\\n]*\\n([\\s\\S]*?)(?=###|##\\s*📊|$)`,'i');
       const match=reply.match(dayRegex);
-      if(match&&!match[1].includes('DESCANSO')&&match[1].trim().length>20){
+      if(match&&match[1].trim().length>5){
+        const contenido=match[1].trim();
+        const esDescanso=/^\s*DESCANSO/i.test(contenido);
         S.planes.unshift({
-          id:Date.now()+saved,
+          id:Date.now()+saved+savedRest,
           fecha:w.date,
           tipo:'semanal',
-          contenido:match[1].trim(),
+          contenido,
+          esDescanso,
           sensaciones:{},
           completado:false,
           diasHastaCarrera:dL
         });
-        saved++;
+        if(esDescanso) savedRest++; else saved++;
       }
     });
     save();
@@ -6471,7 +6743,7 @@ ${week.map(w=>`### ${w.day.toUpperCase()} ${fmtD(w.date)}
         const el=document.getElementById('cmsgs'); if(!el) return;
         const d=document.createElement('div'); d.className='msg-a';
         d.innerHTML=`<div class="bub" style="background:var(--acc2)10;border-color:var(--acc2)40">
-          📅 <strong>${saved} sesiones guardadas en "Mis planes"</strong> — una por día. Puedes marcarlas como completadas según las vayas haciendo.
+          📅 <strong>${saved} sesiones guardadas en "Mis planes"</strong> — una por día, empezando ${startOffset===0?'hoy':'mañana'}. Puedes marcarlas como completadas según las vayas haciendo.
           <br><br><button onclick="go('planes')" style="background:var(--acc2);color:#000;border:none;border-radius:6px;padding:7px 14px;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px;cursor:pointer">VER MIS PLANES →</button>
         </div>`;
         el.appendChild(d); el.scrollTop=el.scrollHeight;
@@ -6773,6 +7045,7 @@ Usa este formato:
       diasHastaCarrera:daysLeft,
       diasDesdeUltimo:daysSinceLast,
       contenido:reply,
+      esDescanso:/##\s*🎯\s*ENTRENAMIENTO DE HOY[^\n]*\n\s*DESCANSO/i.test(reply),
       completado:false
     };
     if(!S.planes) S.planes=[];
@@ -6817,7 +7090,7 @@ function renderPlanes(el){
     </button>
   </div>
 
-  ${planes.length===0?`
+  ${planes.filter(p=>!p.esDescanso).length===0?`
     <div style="text-align:center;padding:3rem 1rem;color:var(--text3)">
       <div style="margin-bottom:1rem"><svg viewBox="0 0 104 92" aria-hidden="true" style="height:40px;width:auto;display:block;margin:0 auto"><circle cx="34" cy="52" r="24" fill="none" stroke="var(--acc)" stroke-width="9"/><circle cx="76" cy="60" r="16" fill="none" stroke="var(--acc)" stroke-width="9"/><circle cx="34" cy="42" r="9" fill="var(--acc)"/><circle cx="76" cy="52" r="6" fill="var(--acc)"/></svg></div>
       <div style="font-size:14px;margin-bottom:.5rem">Aún no tienes planes generados</div>
@@ -6826,7 +7099,7 @@ function renderPlanes(el){
     </div>
   `:`
     <div style="display:flex;flex-direction:column;gap:.75rem">
-      ${planes.map((p,i)=>i).sort((a,b)=>new Date(planes[b].fecha)-new Date(planes[a].fecha)).map(i=>planCard(planes[i],i)).join('')}
+      ${planes.map((p,i)=>i).filter(i=>!planes[i].esDescanso).sort((a,b)=>new Date(planes[b].fecha)-new Date(planes[a].fecha)).map(i=>planCard(planes[i],i)).join('')}
     </div>
   `}`;
 }
@@ -6954,9 +7227,19 @@ function markNoRealizado(i){
 }
 
 // ---- MODAL "¿QUÉ HA PASADO?" al pulsar "No realizado" ----
-// Distingue el caso "estaba cansado/prefiero descansar" (que abre una vía de
-// ajuste del plan futuro hablando con el coach) de un simple contratiempo,
-// donde el usuario solo quiere borrar ese día o desplazar lo que queda.
+// Motivo elegido por el usuario: cansancio/lesión/dolor puntual ofrecen ajustar
+// el plan hablando con el coach (afectan al entreno de mañana); el resto de
+// motivos (otro deporte, falta de tiempo, mal tiempo, otro) solo se registran,
+// sin sugerir recálculo — no tiene sentido "aliviar carga" si no hubo carga.
+const MOTIVOS_NO_REALIZADO=[
+  {key:'cansancio',   label:'😴 Cansancio',            recalcula:true},
+  {key:'lesion',      label:'🤕 Lesión',                recalcula:true},
+  {key:'dolor',       label:'🩹 Dolor puntual',         recalcula:true},
+  {key:'otro_deporte',label:'🏓 Hice otro deporte',     recalcula:false},
+  {key:'falta_tiempo',label:'⏰ Falta de tiempo',        recalcula:false},
+  {key:'mal_tiempo',  label:'🌧️ Mal tiempo',            recalcula:false},
+  {key:'otro',        label:'❓ Otro motivo',            recalcula:false},
+];
 const CANSANCIO_MSGS=[
   'No pasa nada, lo importante es escuchar al cuerpo.',
   'Descansar también es entrenar — el cuerpo se adapta en el descanso, no solo en el esfuerzo.',
@@ -6964,51 +7247,76 @@ const CANSANCIO_MSGS=[
   'Escuchar la fatiga a tiempo es lo que separa una buena temporada de una lesión.',
   'Un día de descanso bien tomado nunca ha arruinado un plan. Lo contrario, sí.',
 ];
+const LESION_DOLOR_MSGS=[
+  'Escuchar al cuerpo cuando algo duele es la decisión correcta — mejor parar a tiempo.',
+  'Una molestia ignorada hoy puede ser semanas de baja mañana. Bien parado.',
+  'Prioriza la recuperación. El plan se adapta, tu cuerpo no se sustituye.',
+  'Correr con dolor casi nunca compensa. Buena decisión frenando ahora.',
+];
 function openNoRealizadoModal(i){
   document.getElementById('noRealizadoModal')?.remove();
   const modal=document.createElement('div');
   modal.id='noRealizadoModal';
   modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
   modal.innerHTML=`
-  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:400px;width:100%;animation:fadeInUp .2s ease">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;animation:fadeInUp .2s ease">
     <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--acc3);margin-bottom:.4rem">¿QUÉ HA PASADO CON ESTE ENTRENO?</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:1.1rem">Elige la opción que mejor encaje.</div>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button onclick="handleNoRealizadoCansado(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
-        <div style="font-size:13px;color:var(--text);font-weight:600">😴 Prefiero descansar — me sentía cansado/a</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Podemos replantear los próximos entrenos si hace falta</div>
-      </button>
-      <button onclick="handleNoRealizadoEliminar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
-        <div style="font-size:13px;color:var(--text);font-weight:600">🗑 No realizado — eliminar este entreno</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Se borra solo el de este día, el resto del plan sigue igual</div>
-      </button>
-      <button onclick="handleNoRealizadoDesplazar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
-        <div style="font-size:13px;color:var(--text);font-weight:600">↪️ No realizado — desplazar mis entrenos 1 día</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">Este y los siguientes se mueven un día hacia adelante</div>
-      </button>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1.1rem">Elige el motivo. Si es cansancio, lesión o dolor, te propongo ajustar los próximos entrenos.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem">
+      ${MOTIVOS_NO_REALIZADO.map(m=>`
+      <button onclick="handleNoRealizadoMotivo(${i},'${m.key}')" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:12px;color:var(--text);font-weight:600">${m.label}</div>
+      </button>`).join('')}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:.75rem">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:.5rem">O, sin indicar motivo:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="handleNoRealizadoEliminar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;font-family:'Inter'">
+          <div style="font-size:12px;color:var(--text);font-weight:600">🗑 Eliminar este entreno</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">Se borra solo el de este día, el resto del plan sigue igual</div>
+        </button>
+        <button onclick="handleNoRealizadoDesplazar(${i})" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;font-family:'Inter'">
+          <div style="font-size:12px;color:var(--text);font-weight:600">↪️ Desplazar mis entrenos 1 día</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">Este y los siguientes se mueven un día hacia adelante</div>
+        </button>
+      </div>
     </div>
     <button onclick="document.getElementById('noRealizadoModal').remove()" style="margin-top:12px;width:100%;background:transparent;border:1px solid var(--border);border-radius:6px;padding:9px;cursor:pointer;color:var(--text3);font-size:12px;font-family:'Inter'">Cancelar</button>
   </div>`;
   document.body.appendChild(modal);
   modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
 }
-function handleNoRealizadoCansado(i){
+function handleNoRealizadoMotivo(i,motivoKey){
   document.getElementById('noRealizadoModal')?.remove();
+  if(!S.planes[i])return;
+  const motivo=MOTIVOS_NO_REALIZADO.find(m=>m.key===motivoKey);
+  S.planes[i].motivoNoRealizado=motivoKey;
   markNoRealizado(i);
-  const msg=CANSANCIO_MSGS[Math.floor(Math.random()*CANSANCIO_MSGS.length)];
-  appConfirm(
-    '😴 DESCANSO REGISTRADO',
-    `${msg}<br><br>Si sientes algo de cansancio acumulado, podemos replantear los próximos entrenamientos. ¿Lo hablamos con ${coachNombre()}?`,
-    'SÍ, AJUSTAR PLAN',
-    ()=>recalcularPorCansancio(i),
-    'var(--acc2)'
-  );
+  if(motivo&&motivo.recalcula){
+    const msgsArr=motivoKey==='cansancio'?CANSANCIO_MSGS:LESION_DOLOR_MSGS;
+    const msg=msgsArr[Math.floor(Math.random()*msgsArr.length)];
+    appConfirm(
+      motivoKey==='cansancio'?'😴 DESCANSO REGISTRADO':'🩹 MOLESTIA REGISTRADA',
+      `${msg}<br><br>¿Hablamos con ${coachNombre()} para ajustar los próximos entrenamientos teniendo esto en cuenta?`,
+      'SÍ, AJUSTAR PLAN',
+      ()=>recalcularPorMotivo(i,motivoKey),
+      'var(--acc2)'
+    );
+  } else {
+    showToast(`Registrado: ${motivo?motivo.label.replace(/^\S+\s/,''):'no realizado'}`,'var(--acc3)');
+  }
 }
-function recalcularPorCansancio(i){
+function recalcularPorMotivo(i,motivoKey){
   const p=S.planes[i];
   if(!p)return;
   const pending=(S.planes||[]).filter((_,j)=>j>i&&!S.planes[j].completado&&!S.planes[j].noRealizado).length;
-  const msg=`Hoy he preferido descansar en vez de hacer el entreno del ${fmtD(p.fecha)} — sentía cansancio acumulado. Tengo ${pending} sesion${pending!==1?'es':''} pendiente${pending!==1?'s':''} por delante. ¿Puedes replantear los próximos entrenamientos teniendo en cuenta esta fatiga?`;
+  const motivoTxt=motivoKey==='cansancio'?'sentía cansancio acumulado'
+    :motivoKey==='lesion'?'tengo una molestia/lesión que me impidió entrenar'
+    :'tuve un dolor puntual que me hizo parar';
+  const adaptacion=motivoKey==='cansancio'
+    ?'ajusta la carga teniendo en cuenta esta fatiga'
+    :'reduce la intensidad o incluye descanso extra hasta que la molestia remita, priorizando no agravarla';
+  const msg=`No pude hacer el entreno del ${fmtD(p.fecha)} — ${motivoTxt}. Tengo ${pending} sesion${pending!==1?'es':''} pendiente${pending!==1?'s':''} por delante. ¿Puedes replantear los próximos entrenamientos y ${adaptacion}?`;
   go('chat');
   const tryFill=(attempts)=>{
     const inp=document.getElementById('cinput');
