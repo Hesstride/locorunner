@@ -410,6 +410,93 @@ const SK = 'stride_v2_b';
 let S = load();
 let pendingImgs = []; // Array of {name, data, mediaType} — global para acceso desde sendMsg y wizard
 
+/* ============================================================
+   CICLO MENSTRUAL — almacenamiento SEPARADO e independiente
+   Por privacidad, estos datos NUNCA viven en el objeto S ni en la clave
+   SK: se guardan en su propia clave de localStorage, para que:
+   - Nunca se incluyan en un backup exportado (exportData() solo serializa S)
+   - Restaurar un backup en otro dispositivo nunca los sobrescriba ni los borre
+   - Un "borrar todos los datos" deba tocarlos explícitamente (ver resetAllData())
+============================================================ */
+const CYCLE_KEY = 'stride_v2_cycle';
+function loadCycleData(){
+  try{
+    const raw=localStorage.getItem(CYCLE_KEY);
+    if(!raw) return {enabled:false, cicloPromedio:28, duracionRegla:5, ultimaFechaInicio:'', historial:[]};
+    const d=JSON.parse(raw);
+    return {enabled:!!d.enabled, cicloPromedio:d.cicloPromedio||28, duracionRegla:d.duracionRegla||5, ultimaFechaInicio:d.ultimaFechaInicio||'', historial:Array.isArray(d.historial)?d.historial:[]};
+  }catch(e){ return {enabled:false, cicloPromedio:28, duracionRegla:5, ultimaFechaInicio:'', historial:[]}; }
+}
+function saveCycleData(data){
+  try{ localStorage.setItem(CYCLE_KEY, JSON.stringify(data)); }catch(e){}
+}
+
+// Diccionario estático de consejos por fase — información general basada en
+// patrones fisiológicos habituales, no un diagnóstico ni sustituto de
+// consejo médico. La variabilidad individual es alta: son orientaciones,
+// no reglas fijas.
+const CYCLE_PHASE_INFO = {
+  menstrual: {
+    nombre:'Fase menstrual', icono:'🔴', color:'var(--acc3)',
+    resumen:'Días de sangrado. La energía percibida suele ser más variable estos primeros días.',
+    consejos:[
+      'Escucha a tu cuerpo: si te apetece entrenar con normalidad, adelante; si prefieres bajar el ritmo o descansar, es una decisión igual de válida, no una debilidad.',
+      'Si el sangrado es abundante, vigila el aporte de hierro (carne roja, legumbres, verde de hoja) — una ferritina baja puede notarse en forma de más fatiga en carrera.',
+      'El dolor o los calambres fuertes no hay que "aguantarlos" entrenando — cambiar a movilidad o rodaje muy suave es razonable.',
+      'Algunas corredoras notan mejor sensación en carrera estos días al bajar la retención de líquidos; otras notan justo lo contrario. No hay una respuesta única.',
+    ]
+  },
+  folicular: {
+    nombre:'Fase folicular', icono:'🟢', color:'var(--acc)',
+    resumen:'Tras la regla y hasta la ovulación. El estrógeno va en aumento — muchas corredoras refieren buena tolerancia al esfuerzo en esta fase.',
+    consejos:[
+      'Suele ser un buen momento para meter las sesiones más exigentes de la semana (series, umbral) si el plan lo pide — la percepción de esfuerzo tiende a ser más baja a la misma intensidad.',
+      'Es una fase habitualmente buena para progresar en fuerza en el gimnasio.',
+      'Sigue siendo importante dormir bien y llegar descansada a las sesiones de calidad: la fase ayuda, pero no sustituye a la recuperación.',
+    ]
+  },
+  ovulacion: {
+    nombre:'Ovulación', icono:'🟡', color:'var(--acc4)',
+    resumen:'Pico de estrógeno alrededor de la mitad del ciclo. Suele coincidir con la mejor sensación de energía del ciclo.',
+    consejos:[
+      'Algunos estudios apuntan a una mayor laxitud ligamentosa en estos días — nada que deba frenarte, pero vale la pena cuidar un poco más la técnica en ejercicios de fuerza con cambios de dirección.',
+      'Buen momento para carreras o entrenos clave si el calendario lo permite, aunque esto varía mucho de una persona a otra.',
+    ]
+  },
+  lutea: {
+    nombre:'Fase lútea', icono:'🟣', color:'#a78bfa',
+    resumen:'De la ovulación a la siguiente regla. La progesterona sube y con ella la temperatura corporal basal — el mismo esfuerzo puede sentirse algo más duro.',
+    consejos:[
+      'Es normal que el pulso en reposo y durante el ejercicio esté un poco más alto que en la fase folicular a la misma intensidad — no es necesariamente una señal de mala forma.',
+      'El gasto energético en reposo aumenta ligeramente: prestar algo más de atención a comer suficiente, especialmente carbohidrato, puede ayudar a sostener la carga de entreno.',
+      'En los días previos a la regla (fase premenstrual) es habitual notar más fatiga o cambios de apetito — si el plan pide una sesión dura y el cuerpo no responde, no pasa nada por adaptarla.',
+      'Si la sesión se hace más cuesta arriba de lo habitual, no es necesariamente una señal de que algo va mal — puede ser simplemente esta fase del ciclo.',
+    ]
+  },
+};
+
+// Calcula en qué fase del ciclo está la atleta hoy, a partir de la fecha de
+// inicio de su última regla y la duración media de su ciclo. Devuelve null
+// si el seguimiento no está activado o falta la fecha de inicio.
+function getCurrentCyclePhase(cycleData){
+  const c=cycleData||loadCycleData();
+  if(!c.enabled || !c.ultimaFechaInicio) return null;
+  const inicio=parseISO(c.ultimaFechaInicio);
+  const hoy=hoy();
+  let diaCiclo=Math.floor((hoy-inicio)/86400000)+1; // día 1 = primer día de regla
+  const dur=c.cicloPromedio||28;
+  if(diaCiclo<1) return null;
+  diaCiclo=((diaCiclo-1)%dur)+1; // por si ha pasado más de un ciclo desde el último registro
+  const reglaFin=c.duracionRegla||5;
+  const ovMid=Math.floor(dur/2); // aproximación: mitad del ciclo
+  let fase;
+  if(diaCiclo<=reglaFin) fase='menstrual';
+  else if(diaCiclo<ovMid-1) fase='folicular';
+  else if(diaCiclo<=ovMid+1) fase='ovulacion';
+  else fase='lutea';
+  return {fase, diaCiclo, duracionCiclo:dur, ...CYCLE_PHASE_INFO[fase]};
+}
+
 function coachNombre(){var g=(S.coach&&S.coach.genero)||'masculino';return g==='femenino'?'Sara':'Alex';}
 
 // Ventanita flotante con los ojos en espiral: se muestra mientras el entrenador
@@ -1049,7 +1136,7 @@ function saveSetup(){
 let onb = null;
 const ONB_DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const ONB_DAYS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','entrenosfijos','objetivo','salud','coach','resumen'];
+const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','entrenosfijos','objetivo','salud','ciclo','coach','resumen'];
 
 function estimateFcmax(rango){
   const mid={'18-25':21,'26-35':30,'36-45':40,'46-55':50,'56-65':60,'65+':68}[rango]||35;
@@ -1105,6 +1192,7 @@ function onbInjectStyles(){
 
 function onbDefaults(){
   const a=S.athlete||{}, c=S.coach||{};
+  const cy=loadCycleData();
   return {
     step:0,
     nombre:a.nombre||'', sexo:a.sexo||'hombre', edad:a.edad||'36-45',
@@ -1118,7 +1206,10 @@ function onbDefaults(){
     lesiones:a.lesiones||'',
     relojMarca:(S.equipacion&&S.equipacion.reloj&&S.equipacion.reloj.marca)||'Coros',
     relojModelo:(S.equipacion&&S.equipacion.reloj&&S.equipacion.reloj.modelo)||'',
-    coachGenero:c.genero||'masculino', coachEstilo:c.estilo||'exigente'
+    coachGenero:c.genero||'masculino', coachEstilo:c.estilo||'exigente',
+    // Ciclo menstrual: se carga de su propio almacenamiento separado (nunca de S)
+    cicloActivar:cy.enabled, cicloFechaInicio:cy.ultimaFechaInicio||'',
+    cicloPromedio:cy.cicloPromedio||28, cicloDuracionRegla:cy.duracionRegla||5,
   };
 }
 
@@ -1192,12 +1283,25 @@ function onbRemoveFijo(i){
   onb.entrenosFijos.splice(i,1);
   onbRender();
 }
-function onbBack(){ if(onb.step>0){onb.step--; onbRender();} }
+function onbBack(){
+  let prev=onb.step-1;
+  while(prev>=0 && onbStepSkip(ONB_STEPS[prev])) prev--;
+  if(prev>=0){ onb.step=prev; onbRender(); }
+}
 function onbNext(){
   const key=ONB_STEPS[onb.step];
   const err=onbValidate(key);
   if(err){ showToast('⚠️ '+err,'var(--acc3)'); return; }
-  if(onb.step<ONB_STEPS.length-1){ onb.step++; onbRender(); }
+  let next=onb.step+1;
+  while(next<ONB_STEPS.length && onbStepSkip(ONB_STEPS[next])) next++;
+  if(next<ONB_STEPS.length){ onb.step=next; onbRender(); }
+}
+// El paso de ciclo menstrual solo tiene sentido si la atleta se ha identificado
+// como mujer en el paso "sobreti" — para cualquier otro caso se salta solo,
+// tanto avanzando como retrocediendo.
+function onbStepSkip(key){
+  if(key==='ciclo') return onb.sexo!=='mujer';
+  return false;
 }
 function onbValidate(key){
   const d=onb;
@@ -1419,6 +1523,37 @@ function onbStepBody(key){
       </div>`;
     }
 
+    case 'ciclo':{
+      return `
+      <div class="onb-title">Ciclo menstrual <span style="font-size:14px;color:var(--text3);font-weight:400">(opcional)</span></div>
+      <div class="onb-sub">Si lo activas, el entrenador puede tener en cuenta la fase de tu ciclo al valorar tus sensaciones — nunca para juzgar tu rendimiento, solo para entender mejor cómo te sientes. Puedes activarlo o desactivarlo cuando quieras desde Mi Perfil, y estos datos <strong style="color:var(--text2)">se guardan solo en este dispositivo, nunca en las copias de seguridad</strong>.</div>
+      <div class="onb-grid2">
+        <button class="onb-opt ${d.cicloActivar?'sel':''}" onclick="onb.cicloActivar=true;onbRender()">
+          <span class="onb-opt-t">Sí, quiero activarlo</span><span class="onb-opt-d">Podré registrar el inicio de cada regla</span>
+        </button>
+        <button class="onb-opt ${!d.cicloActivar?'sel':''}" onclick="onb.cicloActivar=false;onbRender()">
+          <span class="onb-opt-t">No, prefiero no usarlo</span><span class="onb-opt-d">Puedes activarlo más adelante si cambias de idea</span>
+        </button>
+      </div>
+      ${d.cicloActivar?`
+      <div class="onb-grid2">
+        <div>
+          <div class="onb-label">Inicio de tu última regla</div>
+          <input class="onb-input" type="date" value="${d.cicloFechaInicio}" max="${isoLocal(new Date())}" oninput="onb.cicloFechaInicio=this.value">
+        </div>
+        <div>
+          <div class="onb-label">Duración media del ciclo</div>
+          <input class="onb-input" type="number" min="20" max="45" value="${d.cicloPromedio}" oninput="onb.cicloPromedio=this.value" placeholder="28">
+        </div>
+      </div>
+      <div>
+        <div class="onb-label">Duración media de la regla (días)</div>
+        <input class="onb-input" type="number" min="1" max="10" style="max-width:140px" value="${d.cicloDuracionRegla}" oninput="onb.cicloDuracionRegla=this.value" placeholder="5">
+      </div>
+      <div class="onb-note" style="margin:0;text-align:left">Si no recuerdas la fecha exacta, déjalo en blanco — podrás registrarlo la próxima vez que te venga, desde Mi Perfil.</div>`:''}
+      `;
+    }
+
     case 'coach':{
       const estilos=[
         ['exigente','Exigente','Directo y al grano. El dato primero, sin adornos.'],
@@ -1466,6 +1601,7 @@ function onbStepBody(key){
         <div class="onb-sumrow"><span>Entrenos fijos</span><span>${(d.entrenosFijos&&d.entrenosFijos.length)?d.entrenosFijos.map(f=>`${ONB_DAYS[f.dia]} (${esc(f.nombre)})`).join(', '):'Ninguno'}</span></div>
         <div class="onb-sumrow"><span>Objetivo</span><span>${tipos[d.objetivo_tipo]||'—'}${d.objetivo?' · '+d.objetivo:''}</span></div>
         <div class="onb-sumrow"><span>FC máx / reposo</span><span>${d.fcmax||estimateFcmax(d.edad)} / ${d.fcreposo||60} ppm</span></div>
+        ${d.sexo==='mujer'?`<div class="onb-sumrow"><span>Ciclo menstrual</span><span>${d.cicloActivar?'Activado'+(d.cicloFechaInicio?' · desde '+fmtD(d.cicloFechaInicio):''):'No activado'}</span></div>`:''}
         <div class="onb-sumrow" style="border-bottom:none"><span>Entrenador</span><span>${coachN} · ${estN}</span></div>
       </div>`;
     }
@@ -1492,6 +1628,18 @@ function onbFinish(){
   S.equipacion.reloj.marca=d.relojMarca; S.equipacion.reloj.modelo=(d.relojModelo||'').trim();
   if(!S.coach)S.coach={};
   S.coach.genero=d.coachGenero; S.coach.estilo=d.coachEstilo;
+
+  // Ciclo menstrual: se guarda en SU PROPIA clave de localStorage, separada de
+  // S — nunca se mezcla con el resto del perfil ni viaja en los backups.
+  if(d.sexo==='mujer'){
+    saveCycleData({
+      enabled: !!d.cicloActivar,
+      cicloPromedio: parseInt(d.cicloPromedio)||28,
+      duracionRegla: parseInt(d.cicloDuracionRegla)||5,
+      ultimaFechaInicio: d.cicloActivar ? (d.cicloFechaInicio||'') : '',
+      historial: d.cicloActivar && d.cicloFechaInicio ? [d.cicloFechaInicio] : [],
+    });
+  }
 
   // Si el objetivo es una carrera con fecha válida, créala como evento del calendario.
   // Así impulsa la fase de entrenamiento, las proyecciones de tiempo y el calendario del coach.
@@ -4415,6 +4563,107 @@ function renderDevResetPanel(){
     <div style="font-size:10px;color:var(--text3);border-top:1px solid var(--border);padding-top:.6rem">Tu propio ID (por si necesitas dárselo a alguien): <code style="color:var(--acc2)">${myId}</code> <button onclick="navigator.clipboard.writeText('${myId}');showToast('ID copiado','var(--acc2)')" style="background:transparent;border:none;color:var(--acc2);cursor:pointer;font-size:10px;text-decoration:underline">copiar</button></div>
   </div>`;
 }
+// ---- CICLO MENSTRUAL: panel en Mi Perfil (calendario local, sin servidor) ----
+// Todo lo que toca aquí lee/escribe SIEMPRE en CYCLE_KEY, nunca en S.
+// Solo se muestra si el atleta se identificó como mujer en su perfil.
+function renderCyclePanel(){
+  if((S.athlete&&S.athlete.sexo)!=='mujer') return '';
+  const cy=loadCycleData();
+  if(!cy.enabled){
+    return `
+    <div class="panel">
+      <div class="panel-title">🌙 Ciclo menstrual</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:.85rem">No está activado. Si lo activas, el entrenador puede tener en cuenta la fase de tu ciclo al valorar tus sensaciones. Estos datos se guardan solo en este dispositivo — nunca en las copias de seguridad ni en ningún servidor.</div>
+      <button class="btn btn-ghost" onclick="cycleToggleEnable(true)">Activar seguimiento</button>
+    </div>`;
+  }
+  const phase=getCurrentCyclePhase(cy);
+  return `
+  <div class="panel" style="border-color:${phase?phase.color+'25':'var(--border)'}">
+    <div class="panel-title">🌙 Ciclo menstrual</div>
+    ${phase?`
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:1rem">
+      <div style="font-size:28px;line-height:1">${phase.icono}</div>
+      <div>
+        <div style="font-size:14px;font-weight:700;color:${phase.color}">${phase.nombre} · día ${phase.diaCiclo} de ${phase.duracionCiclo}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${esc(phase.resumen)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+      ${phase.consejos.map(c=>`• ${esc(c)}`).join('<br>')}
+    </div>`:`<div style="font-size:12px;color:var(--text3);margin-bottom:1rem">Activado, pero falta la fecha de tu última regla para calcular en qué fase estás. Regístrala abajo.</div>`}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.75rem">
+      <button class="btn btn-acc" onclick="cycleLogToday()">Hoy empieza mi regla</button>
+      <button class="btn btn-ghost" onclick="cycleEditSettings()">Ajustar duración</button>
+      <button class="btn btn-ghost" onclick="cycleToggleEnable(false)">Desactivar</button>
+    </div>
+    <div style="font-size:10px;color:var(--text3)">Ciclo medio: ${cy.cicloPromedio} días · Regla media: ${cy.duracionRegla} días${cy.ultimaFechaInicio?' · Última registrada: '+fmtD(cy.ultimaFechaInicio):''}</div>
+  </div>`;
+}
+function cycleToggleEnable(on){
+  const cy=loadCycleData();
+  cy.enabled=on;
+  saveCycleData(cy);
+  go('perfil');
+  showToast(on?'🌙 Seguimiento del ciclo activado':'Seguimiento del ciclo desactivado','var(--acc2)');
+}
+function cycleLogToday(){
+  appConfirm('🌙 REGISTRAR INICIO DE REGLA','¿Confirmas que hoy es el primer día de tu regla? Esto actualiza el cálculo de la fase actual.','CONFIRMAR',()=>{
+    const cy=loadCycleData();
+    const todayStr=hoyISO();
+    cy.ultimaFechaInicio=todayStr;
+    cy.historial=[...(cy.historial||[]).filter(f=>f!==todayStr), todayStr].slice(-12);
+    // Con 2+ registros, recalcula la duración media del ciclo automáticamente
+    // (descartando diferencias fuera de rango fisiológico razonable)
+    if(cy.historial.length>=2){
+      const fechas=cy.historial.map(f=>parseISO(f)).sort((a,b)=>a-b);
+      const diffs=[];
+      for(let i=1;i<fechas.length;i++) diffs.push(Math.round((fechas[i]-fechas[i-1])/86400000));
+      const validDiffs=diffs.filter(d=>d>=15&&d<=60);
+      if(validDiffs.length) cy.cicloPromedio=Math.round(validDiffs.reduce((a,b)=>a+b,0)/validDiffs.length);
+    }
+    saveCycleData(cy);
+    go('perfil');
+    showToast('Registrado — fase actualizada','var(--acc)');
+  },'var(--acc2)');
+}
+function cycleEditSettings(){
+  const cy=loadCycleData();
+  document.getElementById('cycleEditModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='cycleEditModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:360px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--acc2);margin-bottom:1rem">AJUSTAR CICLO</div>
+    <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.1rem">
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Duración media del ciclo (días)</div>
+        <input id="cycleEditProm" type="number" min="20" max="45" value="${cy.cicloPromedio}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Duración media de la regla (días)</div>
+        <input id="cycleEditRegla" type="number" min="1" max="10" value="${cy.duracionRegla}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('cycleEditModal').remove()" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:6px;padding:9px;cursor:pointer;color:var(--text3);font-size:12px;font-family:'Inter'">Cancelar</button>
+      <button onclick="cycleSaveSettings()" style="flex:1;background:var(--acc2);border:none;border-radius:6px;padding:9px;cursor:pointer;color:#000;font-weight:600;font-size:12px;font-family:'Inter'">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+function cycleSaveSettings(){
+  const cy=loadCycleData();
+  cy.cicloPromedio=parseInt(document.getElementById('cycleEditProm').value)||28;
+  cy.duracionRegla=parseInt(document.getElementById('cycleEditRegla').value)||5;
+  saveCycleData(cy);
+  document.getElementById('cycleEditModal')?.remove();
+  go('perfil');
+  showToast('Ajustes guardados','var(--acc)');
+}
+
 // Panel detallado en Mi Perfil / Ajustes
 function renderUsagePanel(){
   if(isDevMode()){
@@ -6386,6 +6635,17 @@ function buildSys(){
     ? entrenosFijos.slice().sort((x,y)=>x.dia-y.dia).map(f=>`${dayNames[f.dia]} (${f.nombre})`).join(', ')
     : 'ninguno';
 
+  // Ciclo menstrual (opcional, solo si la atleta lo activó). Se lee de su
+  // propio almacenamiento separado (nunca de S) y solo se inyecta si hay
+  // fase calculable — es contexto de apoyo, no un dato para diagnosticar.
+  let cicloStr='';
+  if(a.sexo==='mujer'){
+    const cyPhase=getCurrentCyclePhase();
+    if(cyPhase){
+      cicloStr=`\n\n══════════════════════════════════\nCICLO MENSTRUAL (contexto opcional activado por la atleta)\n══════════════════════════════════\nHoy está en: ${cyPhase.nombre} (día ${cyPhase.diaCiclo} de ${cyPhase.duracionCiclo}).\nÚsalo solo como contexto de apoyo si viene a cuento (p.ej. si comenta más fatiga de lo normal o menor tolerancia al esfuerzo) — nunca lo menciones si no aporta, nunca lo uses para explicar un mal entreno sin que ella lo haya sugerido antes, y nunca lo trates como una limitación fija. Es información de fondo, no un diagnóstico.`;
+    }
+  }
+
   const todayForSys = new Date(); todayForSys.setHours(0,0,0,0);
   const daysSinceLastStr = last ? (() => {
     const d = Math.round((todayForSys - new Date(last.fecha+'T00:00:00')) / 86400000);
@@ -6467,6 +6727,7 @@ ENTRENOS PLANIFICADOS PENDIENTES
 ══════════════════════════════════
 ${planesStr}
 (Estos son los entrenos que el atleta ya tiene planificados. Tenlos presentes: puedes referirte a ellos, ajustarlos o recordárselos cuando venga a cuento.)
+${cicloStr}
 
 ══════════════════════════════════
 HISTORIAL COMPLETO (${E.length} entrenos)
@@ -7594,6 +7855,7 @@ function renderPerfil(el){
 
   <!-- ESTADO DEL ENTRENADOR IA -->
   ${renderUsagePanel()}
+  ${renderCyclePanel()}
   ${renderDevResetPanel()}`;
 }
 function pf(lbl,key,val,type){return`<div><div style="font-size:10px;color:var(--text2);margin-bottom:4px">${lbl}</div><input type="${type}" id="f-${key}" value="${val}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Inter',sans-serif;font-size:12px;outline:none"></div>`;}
@@ -8178,8 +8440,9 @@ function disconnectApi(){
 }
 
 function resetAllData(){
-  appConfirm('⚠️ BORRAR TODOS LOS DATOS','Se eliminarán <strong style="color:var(--text)">todos</strong> tus entrenamientos, eventos, planes y equipación de este dispositivo.<br><br>Exporta antes un backup si quieres conservarlos. Esta acción no se puede deshacer.','BORRAR TODO',()=>{
+  appConfirm('⚠️ BORRAR TODOS LOS DATOS','Se eliminarán <strong style="color:var(--text)">todos</strong> tus entrenamientos, eventos, planes y equipación de este dispositivo — incluido el registro del ciclo menstrual si lo tenías activado.<br><br>Exporta antes un backup si quieres conservarlos (el ciclo menstrual nunca se incluye en el backup, así que si quieres conservarlo, apunta tus datos aparte). Esta acción no se puede deshacer.','BORRAR TODO',()=>{
     localStorage.removeItem(SK);
+    localStorage.removeItem(CYCLE_KEY);
     S=load();
     save();
     go('dash');
