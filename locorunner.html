@@ -8809,18 +8809,22 @@ function showLegalDisclaimerRetro(){
   modal.innerHTML=`
   <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;animation:fadeInUp .3s ease">
     <div style="padding:1.4rem 1.4rem .5rem">
-      <div class="onb-title" style="font-size:22px">Antes de seguir</div>
-      <div class="onb-sub">Hemos actualizado nuestro aviso legal. Léelo y acéptalo para continuar usando Locorunner.</div>
+      <div style="font-family:'Bebas Neue';font-size:26px;letter-spacing:1.5px;color:var(--acc);line-height:1.1">ANTES DE SEGUIR</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin-top:6px">Hemos actualizado nuestro aviso legal. Léelo y acéptalo para continuar usando Locorunner.</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:.85rem;background:var(--acc)12;border:1px solid var(--acc)30;border-radius:8px;padding:9px 12px">
+        <span style="font-size:16px">🔒</span>
+        <span style="font-size:12px;color:var(--text);line-height:1.4">Tus entrenamientos, planes y datos de salud <strong>nunca salen de tu dispositivo</strong> — ni nosotros los vemos.</span>
+      </div>
     </div>
     <div style="padding:0 1.4rem 1rem">
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;max-height:260px;overflow-y:auto;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;max-height:220px;overflow-y:auto;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
       <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:.85rem 0 .25rem">
         <input type="checkbox" id="legalRetroCheck" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--acc)">
         <span style="font-size:13px;color:var(--text)">He leído y acepto el aviso anterior.</span>
       </label>
     </div>
-    <div class="onb-foot">
-      <button class="onb-btn onb-btn-primary" style="flex:1" onclick="acceptLegalDisclaimerRetro()">ACEPTAR Y CONTINUAR</button>
+    <div style="padding:1rem 1.4rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--bg2)">
+      <button onclick="acceptLegalDisclaimerRetro()" style="width:100%;border:none;border-radius:9px;padding:13px 16px;cursor:pointer;font-family:'Bebas Neue';font-size:16px;letter-spacing:1.5px;background:var(--acc);color:#000;transition:filter .15s" onmouseover="this.style.filter='brightness(1.08)'" onmouseout="this.style.filter='none'">ACEPTAR Y CONTINUAR</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -8842,14 +8846,18 @@ function showLegalDisclaimerReadOnly(){
   modal.innerHTML=`
   <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;animation:fadeInUp .3s ease">
     <div style="padding:1.4rem 1.4rem .5rem">
-      <div class="onb-title" style="font-size:22px">Aviso legal</div>
-      <div class="onb-sub">${fechaTxt}</div>
+      <div style="font-family:'Bebas Neue';font-size:26px;letter-spacing:1.5px;color:var(--acc);line-height:1.1">AVISO LEGAL</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.55;margin-top:6px">${fechaTxt}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:.85rem;background:var(--acc)12;border:1px solid var(--acc)30;border-radius:8px;padding:9px 12px">
+        <span style="font-size:16px">🔒</span>
+        <span style="font-size:12px;color:var(--text);line-height:1.4">Tus entrenamientos, planes y datos de salud <strong>nunca salen de tu dispositivo</strong> — ni nosotros los vemos.</span>
+      </div>
     </div>
     <div style="padding:0 1.4rem 1.4rem">
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
     </div>
-    <div class="onb-foot">
-      <button class="onb-btn onb-btn-primary" style="flex:1" onclick="document.getElementById('legalRetroModal').remove()">CERRAR</button>
+    <div style="padding:1rem 1.4rem;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--bg2)">
+      <button onclick="document.getElementById('legalRetroModal').remove()" style="width:100%;border:none;border-radius:9px;padding:13px 16px;cursor:pointer;font-family:'Bebas Neue';font-size:16px;letter-spacing:1.5px;background:var(--acc);color:#000;transition:filter .15s" onmouseover="this.style.filter='brightness(1.08)'" onmouseout="this.style.filter='none'">CERRAR</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
