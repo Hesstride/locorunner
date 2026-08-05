@@ -402,6 +402,10 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 
 <input type="file" id="fileInput" accept="image/*" style="display:none">
 
+<!-- SDK de Supabase, cargado desde CDN (no embebido: el login necesita
+     internet sí o sí, así que no protege nada tenerlo offline) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 /* ============================================================
    DATA
@@ -409,6 +413,30 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 const SK = 'stride_v2_b';
 let S = load();
 let pendingImgs = []; // Array of {name, data, mediaType} — global para acceso desde sendMsg y wizard
+
+/* ============================================================
+   AVISO LEGAL / DISCLAIMER — texto PLACEHOLDER
+   ⚠️ Este texto es un borrador funcional, no texto legal definitivo.
+   Debe revisarlo un abogado antes de considerarse válido de cara a
+   usuarios reales. La versión se usa para forzar re-aceptación si el
+   texto cambia de forma sustancial en el futuro.
+============================================================ */
+const LEGAL_DISCLAIMER_VERSION = '1.0';
+const LEGAL_DISCLAIMER_TEXT = `Locorunner es una herramienta de apoyo al entrenamiento que utiliza inteligencia artificial (Claude, de Anthropic) para generar recomendaciones de entrenamiento de running a partir de los datos que introduces y de principios generales de fisiología del ejercicio.
+
+Antes de continuar, es importante que sepas:
+
+• Locorunner NO es un servicio médico ni sustituye el consejo de un médico, fisioterapeuta o entrenador titulado. Los planes y análisis que recibes están generados por un modelo de inteligencia artificial y pueden contener errores.
+
+• Si tienes alguna condición médica preexistente, estás embarazada, te estás recuperando de una lesión, o tienes dudas sobre tu capacidad para hacer ejercicio, consulta a un profesional sanitario antes de seguir cualquier plan de entrenamiento, incluidos los generados por esta app.
+
+• Eres tú quien decide si un entrenamiento es adecuado para ti en cada momento. Detén cualquier actividad si sientes dolor, mareo, opresión en el pecho u otros síntomas de alarma, y busca atención médica si es necesario.
+
+• El running y el ejercicio físico conllevan riesgos inherentes de lesión. Al usar Locorunner, asumes voluntariamente esos riesgos.
+
+• Los datos que introduces (edad, peso, frecuencia cardíaca, entrenamientos y, si lo activas, información de tu ciclo menstrual) se usan para personalizar tus recomendaciones. Puedes consultar cómo tratamos tus datos en la Política de Privacidad.
+
+Al marcar la casilla y continuar, confirmas que has leído y entendido este aviso.`;
 
 /* ============================================================
    CICLO MENSTRUAL — almacenamiento SEPARADO e independiente
@@ -1136,7 +1164,7 @@ function saveSetup(){
 let onb = null;
 const ONB_DAYS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 const ONB_DAYS_FULL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','entrenosfijos','objetivo','salud','ciclo','coach','resumen'];
+const ONB_STEPS = ['intro','sobreti','cuerpo','nivel','volumen','disponibilidad','entrenosfijos','objetivo','salud','ciclo','coach','legal','resumen'];
 
 function estimateFcmax(rango){
   const mid={'18-25':21,'26-35':30,'36-45':40,'46-55':50,'56-65':60,'65+':68}[rango]||35;
@@ -1210,6 +1238,9 @@ function onbDefaults(){
     // Ciclo menstrual: se carga de su propio almacenamiento separado (nunca de S)
     cicloActivar:cy.enabled, cicloFechaInicio:cy.ultimaFechaInicio||'',
     cicloPromedio:cy.cicloPromedio||28, cicloDuracionRegla:cy.duracionRegla||5,
+    // Aviso legal: nunca se precarga como aceptado, hay que marcarlo cada vez
+    // que se ejecuta el asistente (si ya estaba aceptado, este paso ni se muestra)
+    legalAceptado:false,
   };
 }
 
@@ -1298,9 +1329,11 @@ function onbNext(){
 }
 // El paso de ciclo menstrual solo tiene sentido si la atleta se ha identificado
 // como mujer en el paso "sobreti" — para cualquier otro caso se salta solo,
-// tanto avanzando como retrocediendo.
+// tanto avanzando como retrocediendo. El paso legal se salta si ya se aceptó
+// la versión vigente del aviso (para no pedir el check en cada edición de perfil).
 function onbStepSkip(key){
   if(key==='ciclo') return onb.sexo!=='mujer';
+  if(key==='legal') return !!(S.legal && S.legal.aceptado && S.legal.version===LEGAL_DISCLAIMER_VERSION);
   return false;
 }
 function onbValidate(key){
@@ -1311,6 +1344,7 @@ function onbValidate(key){
   if(key==='volumen'  && d.volumenSemanal==='') return 'Indica cuántos km corres a la semana.';
   if(key==='disponibilidad' && d.diasDisponibles.length<1) return 'Marca al menos un día disponible.';
   if(key==='objetivo' && !d.objetivo_tipo) return 'Elige tu objetivo.';
+  if(key==='legal' && !d.legalAceptado) return 'Tienes que leer y aceptar el aviso para continuar.';
   return null;
 }
 
@@ -1584,6 +1618,18 @@ function onbStepBody(key){
       </div>`;
     }
 
+    case 'legal':{
+      return `
+      <div class="onb-title">Antes de empezar</div>
+      <div class="onb-sub">Tómate un momento para leer esto — es importante.</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;max-height:260px;overflow-y:auto;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:.25rem 0">
+        <input type="checkbox" ${d.legalAceptado?'checked':''} onchange="onb.legalAceptado=this.checked" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--acc)">
+        <span style="font-size:13px;color:var(--text)">He leído y acepto el aviso anterior.</span>
+      </label>
+      `;
+    }
+
     case 'resumen':{
       const nivelTxt={principiante:'Principiante',intermedio:'Intermedio',avanzado:'Avanzado'}[d.nivel]||'—';
       const dias=d.diasDisponibles.slice().sort((a,b)=>a-b).map(i=>ONB_DAYS[i]).join(', ')||'—';
@@ -1628,6 +1674,12 @@ function onbFinish(){
   S.equipacion.reloj.marca=d.relojMarca; S.equipacion.reloj.modelo=(d.relojModelo||'').trim();
   if(!S.coach)S.coach={};
   S.coach.genero=d.coachGenero; S.coach.estilo=d.coachEstilo;
+
+  // Aviso legal: solo se sobreescribe si este paso pedía aceptación (si ya
+  // estaba aceptado con la versión vigente, el paso se saltó y no tocamos nada).
+  if(d.legalAceptado){
+    S.legal={aceptado:true, fecha:new Date().toISOString(), version:LEGAL_DISCLAIMER_VERSION};
+  }
 
   // Ciclo menstrual: se guarda en SU PROPIA clave de localStorage, separada de
   // S — nunca se mezcla con el resto del perfil ni viaja en los backups.
@@ -4417,6 +4469,145 @@ function getApiKey(){return true;}
 // URL de tu proxy en Vercel. Cámbiala por la tuya tras desplegar
 // (Vercel te la da como https://TU-PROYECTO.vercel.app).
 const STRIDE_PROXY_URL='https://stride-proxy-navy.vercel.app/api/anthropic';
+
+/* ============================================================
+   CUENTA LOCORUNNER (Fase 2) — Supabase Auth con código de 6 dígitos
+   Todavía OPCIONAL: nadie se queda fuera de la app por no tener cuenta.
+   Sirve para ir probando el registro/login antes de que sea obligatorio
+   (eso llegará más adelante, ligado a activar los cobros).
+============================================================ */
+const SUPABASE_URL='https://iybbfheabhvfbtdlgcdf.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_3RxN6g58pWzIdBf98oVWrw_rZk8KmAm';
+const LOCORUNNER_ADMIN_URL='https://locorunner-admin.vercel.app';
+
+let _sbClient=null;
+function getSbClient(){
+  if(!_sbClient && window.supabase){
+    _sbClient=window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  }
+  return _sbClient;
+}
+
+// Estado de la sesión, cacheado en memoria para poder pintar el panel de
+// forma síncrona (renderPerfil es síncrono; comprobar la sesión con
+// Supabase es async, así que la guardamos aparte y solo la refrescamos
+// en los momentos que importan: al arrancar, y tras login/logout).
+window._authSession=null;
+window._authUiStep='email'; // 'email' | 'code' | 'done' — solo mientras se está logueando
+window._authPendingEmail='';
+
+function initAuthListener(){
+  const client=getSbClient();
+  if(!client) return;
+  client.auth.getSession().then(({data})=>{ window._authSession=data?.session||null; });
+  client.auth.onAuthStateChange((event, session)=>{
+    window._authSession=session;
+    if(view==='perfil'){ renderPerfil(document.getElementById('main')); }
+  });
+}
+
+async function authSendCode(){
+  const input=document.getElementById('authEmailInput');
+  const email=(input?.value||'').trim();
+  if(!email || !email.includes('@')){ showToast('Escribe un email válido','var(--acc3)'); return; }
+  const client=getSbClient();
+  if(!client){ showToast('No se pudo cargar el sistema de login (¿sin conexión?)','var(--acc3)'); return; }
+  const btn=document.getElementById('authSendBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Enviando…'; }
+  const { error }=await client.auth.signInWithOtp({ email, options:{ shouldCreateUser:true } });
+  if(btn){ btn.disabled=false; btn.textContent='Enviar código'; }
+  if(error){ showToast('Error: '+error.message,'var(--acc3)'); return; }
+  window._authPendingEmail=email;
+  window._authUiStep='code';
+  renderPerfil(document.getElementById('main'));
+  showToast('Código enviado a '+email,'var(--acc)');
+}
+
+async function authVerifyCode(){
+  const input=document.getElementById('authCodeInput');
+  const code=(input?.value||'').trim();
+  if(!code||code.length<6){ showToast('Introduce el código de 6 dígitos','var(--acc3)'); return; }
+  const client=getSbClient();
+  const email=window._authPendingEmail;
+  const btn=document.getElementById('authVerifyBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Verificando…'; }
+  const { data, error }=await client.auth.verifyOtp({ email, token:code, type:'email' });
+  if(btn){ btn.disabled=false; btn.textContent='Verificar código'; }
+  if(error){ showToast('Código incorrecto o caducado: '+error.message,'var(--acc3)'); return; }
+  window._authSession=data?.session||null;
+  window._authUiStep='done';
+  const accessToken=data?.session?.access_token;
+  if(accessToken) await authLinkDevice(accessToken);
+  renderPerfil(document.getElementById('main'));
+  showToast('¡Sesión iniciada!','var(--acc)');
+}
+
+// Vincula el deviceId anónimo que este navegador ya usaba a la cuenta que
+// se acaba de crear/iniciar sesión — el "puente de migración" del esquema.
+async function authLinkDevice(accessToken){
+  try{
+    const res=await fetch(LOCORUNNER_ADMIN_URL+'/api/link-device',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+accessToken },
+      body:JSON.stringify({ device_id:getUserId() })
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){
+      showToast('Aviso: no se pudo vincular el dispositivo ('+(data?.error?.message||res.status)+')','var(--acc3)');
+    }
+  }catch(e){
+    showToast('Aviso: fallo de red al vincular el dispositivo','var(--acc3)');
+  }
+}
+
+async function authLogout(){
+  const client=getSbClient();
+  if(client) await client.auth.signOut();
+  window._authSession=null;
+  window._authUiStep='email';
+  window._authPendingEmail='';
+  renderPerfil(document.getElementById('main'));
+  showToast('Sesión cerrada','var(--text2)');
+}
+
+function authCancelCode(){
+  window._authUiStep='email';
+  window._authPendingEmail='';
+  renderPerfil(document.getElementById('main'));
+}
+
+function renderAccountPanel(){
+  const session=window._authSession;
+  if(session?.user){
+    return `
+    <div class="panel">
+      <div class="panel-title">👤 Mi cuenta</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">Sesión iniciada como <strong style="color:var(--text)">${esc(session.user.email)}</strong></div>
+      <button class="btn btn-ghost" onclick="authLogout()">Cerrar sesión</button>
+    </div>`;
+  }
+  if(window._authUiStep==='code'){
+    return `
+    <div class="panel">
+      <div class="panel-title">👤 Mi cuenta</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:.85rem">Te hemos enviado un código de 6 dígitos a <strong style="color:var(--text)">${esc(window._authPendingEmail)}</strong>. Escríbelo aquí:</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:.5rem">
+        <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="123456" style="width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:3px;text-align:center;outline:none">
+        <button id="authVerifyBtn" class="btn btn-acc" onclick="authVerifyCode()">Verificar código</button>
+      </div>
+      <button onclick="authCancelCode()" style="background:transparent;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Inter'">Usar otro email</button>
+    </div>`;
+  }
+  return `
+  <div class="panel">
+    <div class="panel-title">👤 Mi cuenta</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.85rem">Opcional por ahora. Crear una cuenta te permitirá, más adelante, mantener tu suscripción y tu progreso ligados a ti, no solo a este dispositivo.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="authEmailInput" type="email" placeholder="tu@email.com" style="flex:1;min-width:180px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">
+      <button id="authSendBtn" class="btn btn-acc" onclick="authSendCode()">Enviar código</button>
+    </div>
+  </div>`;
+}
 
 function apiUrl(){
   return STRIDE_PROXY_URL;
@@ -7853,6 +8044,17 @@ function renderPerfil(el){
     </div>
   </div>
 
+  <!-- MI CUENTA (Fase 2, opcional por ahora) -->
+  ${renderAccountPanel()}
+
+  <!-- LEGAL -->
+  <div class="panel">
+    <div class="panel-title">📄 Legal</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="showLegalDisclaimerReadOnly()">Ver aviso legal</button>
+    </div>
+  </div>
+
   <!-- ESTADO DEL ENTRENADOR IA -->
   ${renderUsagePanel()}
   ${renderCyclePanel()}
@@ -8595,7 +8797,67 @@ function initTheme(){
   const btn=document.getElementById('themeToggle');
   if(btn) btn.textContent=saved==='light'?'☀️':'🌙';
 }
+// ---- Aviso legal retroactivo ----
+// Para usuarios que ya completaron el onboarding ANTES de que existiera este
+// paso (o que aceptaron una versión antigua del aviso). No reabre todo el
+// asistente: es un modal independiente y bloqueante hasta que se acepte.
+function showLegalDisclaimerRetro(){
+  if(document.getElementById('legalRetroModal')) return;
+  const modal=document.createElement('div');
+  modal.id='legalRetroModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000ee;z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;animation:fadeInUp .3s ease">
+    <div style="padding:1.4rem 1.4rem .5rem">
+      <div class="onb-title" style="font-size:22px">Antes de seguir</div>
+      <div class="onb-sub">Hemos actualizado nuestro aviso legal. Léelo y acéptalo para continuar usando Locorunner.</div>
+    </div>
+    <div style="padding:0 1.4rem 1rem">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;max-height:260px;overflow-y:auto;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:.85rem 0 .25rem">
+        <input type="checkbox" id="legalRetroCheck" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;accent-color:var(--acc)">
+        <span style="font-size:13px;color:var(--text)">He leído y acepto el aviso anterior.</span>
+      </label>
+    </div>
+    <div class="onb-foot">
+      <button class="onb-btn onb-btn-primary" style="flex:1" onclick="acceptLegalDisclaimerRetro()">ACEPTAR Y CONTINUAR</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function acceptLegalDisclaimerRetro(){
+  const chk=document.getElementById('legalRetroCheck');
+  if(!chk||!chk.checked){ showToast('⚠️ Tienes que marcar la casilla para continuar','var(--acc3)'); return; }
+  S.legal={aceptado:true, fecha:new Date().toISOString(), version:LEGAL_DISCLAIMER_VERSION};
+  save();
+  document.getElementById('legalRetroModal')?.remove();
+}
+// Ver el aviso en cualquier momento desde Mi Perfil (sin exigir aceptación de nuevo)
+function showLegalDisclaimerReadOnly(){
+  if(document.getElementById('legalRetroModal')) return;
+  const modal=document.createElement('div');
+  modal.id='legalRetroModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000ee;z-index:3000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  const fechaTxt=(S.legal&&S.legal.aceptado)?`Aceptado el ${fmtD(S.legal.fecha.slice(0,10))}.`:'Aún no aceptado.';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;animation:fadeInUp .3s ease">
+    <div style="padding:1.4rem 1.4rem .5rem">
+      <div class="onb-title" style="font-size:22px">Aviso legal</div>
+      <div class="onb-sub">${fechaTxt}</div>
+    </div>
+    <div style="padding:0 1.4rem 1.4rem">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem;font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-line">${esc(LEGAL_DISCLAIMER_TEXT)}</div>
+    </div>
+    <div class="onb-foot">
+      <button class="onb-btn onb-btn-primary" style="flex:1" onclick="document.getElementById('legalRetroModal').remove()">CERRAR</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
 initTheme();
+initAuthListener();
 checkDevModeFromUrl();
 checkObjetivoRecordatorio();
 go('dash');
@@ -8603,6 +8865,9 @@ updateTopbar();
 updateStravaStatus();
 if(!S.athlete.nombre || !S.athlete.altura){
   setTimeout(()=>startOnboarding(), 400);
+} else if(!S.legal || !S.legal.aceptado || S.legal.version!==LEGAL_DISCLAIMER_VERSION){
+  // Usuario ya onboardeado antes de que existiera el aviso — se lo pedimos aparte
+  setTimeout(()=>showLegalDisclaimerRetro(), 400);
 }
 // Wire up import input
 document.getElementById('importInput').onchange = function(e){
