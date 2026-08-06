@@ -726,7 +726,7 @@ function buildAnalisisMsg(t){
   const sens=t.sensaciones?` Sensaciones ese día: ${t.sensaciones.toLowerCase()}.`:'';
   const extra=(com||sens)?` Mi comentario de ese día: "${com}".${sens}`:'';
   const cierre=(com||sens)?' teniendo muy en cuenta mi comentario y sensaciones':'';
-  return `${fmtD(t.fecha)}, ${t.tipo} ${t.dist}km a ${fmt(t.ritmo)}/km — FC ${t.fc||'—'}, cad ${t.cad||'—'}${t.ts?', t.suelo '+t.ts+'ms':''}.${extra} Sin listar datos, solo dime qué tal fue${cierre}.`;
+  return `${fmtD(t.fecha)}, ${t.tipo} ${t.dist}km a ${fmt(t.ritmo)}/km — FC ${t.fc||'—'}, cad ${t.cad||'—'}${t.ts?', t.suelo '+t.ts+'ms':''}${t.zan?', zancada '+t.zan+'cm':''}.${extra} Sin listar datos, solo dime qué tal fue${cierre}.`;
 }
 
 // Color de acento vigente (lima en oscuro, naranja en claro). Para pintar las gráficas
