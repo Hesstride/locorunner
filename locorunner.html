@@ -4553,6 +4553,7 @@ const LOCORUNNER_ADMIN_URL='https://locorunner-admin.vercel.app';
 const STRAVA_CLIENT_ID='243915';
 const STRAVA_TOKEN_URL=STRIDE_PROXY_URL.replace('/api/anthropic','/api/strava-token');
 const STRAVA_ACTIVITIES_URL=STRIDE_PROXY_URL.replace('/api/anthropic','/api/strava-activities');
+const STRAVA_LAPS_URL=STRIDE_PROXY_URL.replace('/api/anthropic','/api/strava-laps');
 
 function stravaConnect(){
   const redirectUri=encodeURIComponent(window.location.origin+window.location.pathname);
@@ -4673,6 +4674,18 @@ function normalizarActividadStrava(act){
 // lo que está claro, pero NO interrumpe con el modal de duplicados; los dudosos
 // se guardan en S.conexiones.strava.pendientesDuplicados para revisar cuando
 // el usuario quiera (nunca se pierden, solo se posponen).
+// Trae las vueltas de una actividad de Strava (para detectar series/tempo).
+// Si falla, devuelve null — la sincronización sigue sin esos datos, no se corta.
+async function fetchStravaLaps(activityId, token){
+  try{
+    const res=await fetch(`${STRAVA_LAPS_URL}?activity_id=${activityId}`,{
+      headers:{Authorization:'Bearer '+token}
+    });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ return null; }
+}
+
 async function stravaSync(silent){
   const token=await stravaEnsureValidToken();
   if(!token){ if(!silent)showToast('No se pudo conectar con Strava — prueba a reconectarlo','var(--acc3)'); return; }
@@ -4688,14 +4701,21 @@ async function stravaSync(silent){
     if(!res.ok){ if(!silent)showToast('Error trayendo actividades de Strava','var(--acc3)'); if(btn){btn.disabled=false;btn.textContent='Sincronizar ahora';} return; }
 
     let importadas=0; const pendientesDup=[];
-    (activities||[]).forEach(act=>{
+    for(const act of (activities||[])){
       const nuevo=normalizarActividadStrava(act);
-      if(!nuevo) return;
-      if((S.entrenamientos||[]).some(e=>e.origen==='strava'&&e.origenId===nuevo.origenId)) return; // ya sincronizado antes
+      if(!nuevo) continue;
+      if((S.entrenamientos||[]).some(e=>e.origen==='strava'&&e.origenId===nuevo.origenId)) continue; // ya sincronizado antes
+      // Estructura real por vueltas (series/tempo) — solo para carrera/trail,
+      // así no gastamos peticiones de más en bici/gimnasio/otros deportes.
+      if(nuevo.deporte==='Running'||nuevo.deporte==='Trail'){
+        const rawLaps=await fetchStravaLaps(act.id, token);
+        const estructura=detectarEstructuraLaps(normalizarLapsStrava(rawLaps));
+        if(estructura){ nuevo.laps=estructura.laps; nuevo.esEstructurado=estructura.esEstructurado; }
+      }
       const candidatos=buscarPosiblesDuplicados(nuevo);
       if(candidatos.length){ pendientesDup.push(nuevo); }
       else{ S.entrenamientos.push(nuevo); importadas++; }
-    });
+    }
     S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
     S.conexiones.strava.lastSync=new Date().toISOString();
 
@@ -8568,9 +8588,14 @@ function computeHrzFromRecords(records, fcmax){
    del mismo km/ritmo medio le llegaban al coach EXACTAMENTE iguales.
    Esto extrae cada tramo real (distancia/ritmo/FC) y detecta si hay
    varianza de ritmo suficiente para ser series, no solo autolaps de
-   un rodaje uniforme.
+   un rodaje uniforme. Funciona igual venga el entreno de .FIT o de
+   Strava — cada fuente tiene su propio "normalizador" que traduce su
+   formato de vuelta al mismo formato común {distKm,secs,ritmo,fc}, y
+   luego un único detector decide si es estructura real, sea cual sea
+   el origen.
 ============================================================ */
-function detectarEstructuraLaps(laps){
+// Normaliza las vueltas crudas del parser de .FIT
+function normalizarLapsFit(laps){
   if(!laps||laps.length<2) return null;
   const validas=laps
     .filter(l=>l.total_distance>0 && (l.total_elapsed_time||l.total_timer_time)>0)
@@ -8581,14 +8606,33 @@ function detectarEstructuraLaps(laps){
       const fc=l.avg_heart_rate?Math.round(l.avg_heart_rate):null;
       return {distKm:parseFloat(distKm.toFixed(2)), secs, ritmo:parseFloat(ritmo.toFixed(2)), fc};
     });
-  if(validas.length<2) return null;
-  const ritmos=validas.map(l=>l.ritmo);
+  return validas.length>=2?validas:null;
+}
+// Normaliza las vueltas crudas de la API de Strava (mismo formato de salida)
+function normalizarLapsStrava(laps){
+  if(!laps||laps.length<2) return null;
+  const validas=laps
+    .filter(l=>l.distance>0 && (l.moving_time||l.elapsed_time)>0)
+    .map(l=>{
+      const distKm=l.distance/1000;
+      const secs=Math.round(l.moving_time||l.elapsed_time);
+      const ritmo=secs/60/distKm;
+      const fc=l.average_heartrate?Math.round(l.average_heartrate):null;
+      return {distKm:parseFloat(distKm.toFixed(2)), secs, ritmo:parseFloat(ritmo.toFixed(2)), fc};
+    });
+  return validas.length>=2?validas:null;
+}
+// Decide, a partir de tramos YA NORMALIZADOS (venga de donde venga), si hay
+// estructura real (series/tempo) o es solo un rodaje continuo.
+function detectarEstructuraLaps(lapsNormalizadas){
+  if(!lapsNormalizadas||lapsNormalizadas.length<2) return null;
+  const ritmos=lapsNormalizadas.map(l=>l.ritmo);
   const minR=Math.min(...ritmos), maxR=Math.max(...ritmos);
   // Más de 1 min/km de diferencia entre el tramo más rápido y el más lento,
   // con al menos 3 tramos: es estructura real (series/tempo con recuperación),
   // no simples autolaps de 1km de un rodaje a ritmo uniforme.
-  const esEstructurado = validas.length>=3 && (maxR-minR)>1.0;
-  return {laps:validas, esEstructurado};
+  const esEstructurado = lapsNormalizadas.length>=3 && (maxR-minR)>1.0;
+  return {laps:lapsNormalizadas, esEstructurado};
 }
 
 // Traduce el campo 'sport' del FIT a nuestra lista de deportes
@@ -8662,7 +8706,7 @@ async function handleFitFiles(fileList){
       // Zonas FC reales calculadas a partir de las muestras de pulso del archivo
       const hrz=computeHrzFromRecords(data.records, S.athlete?.fcmax);
       // Estructura real por vueltas (series/tempo) — antes se ignoraba del todo
-      const estructura=detectarEstructuraLaps(data.laps);
+      const estructura=detectarEstructuraLaps(normalizarLapsFit(data.laps));
 
       // Duplicado: no lo saltamos sin más — si al entreno existente le faltan datos, se rellenan
       const existing=S.entrenamientos.find(e=>e.fecha===fecha&&Math.abs(e.dist-dist)<0.1);
