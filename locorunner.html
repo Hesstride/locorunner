@@ -422,7 +422,7 @@ let pendingImgs = []; // Array of {name, data, mediaType} — global para acceso
    texto cambia de forma sustancial en el futuro.
 ============================================================ */
 const LEGAL_DISCLAIMER_VERSION = '1.0';
-const LEGAL_DISCLAIMER_TEXT = `Locorunner es una herramienta de apoyo al entrenamiento que utiliza inteligencia artificial para generar recomendaciones de entrenamiento de running a partir de los datos que introduces y de principios generales de fisiología del ejercicio.
+const LEGAL_DISCLAIMER_TEXT = `Locorunner es una herramienta de apoyo al entrenamiento que utiliza inteligencia artificial (Claude, de Anthropic) para generar recomendaciones de entrenamiento de running a partir de los datos que introduces y de principios generales de fisiología del ejercicio.
 
 Antes de continuar, es importante que sepas:
 
@@ -633,7 +633,16 @@ function emptyState(){
     eventos:[],
     kmObjetivoAnual:1000,
     prs:{},
-    strava:{clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
+    // Conexiones con relojes/plataformas externas. SOLO tokens de sesión —
+    // nunca client_id/client_secret (esos viven en el servidor, compartidos
+    // por todos los usuarios, para que nadie tenga que pagar su propia
+    // suscripción de desarrollador). Misma forma para las 3, aunque Garmin
+    // funcione por notificaciones (push) y no por sincronización manual.
+    conexiones:{
+      strava:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+      coros:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+      garmin:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
+    }
   };
 }
 function load(){
@@ -645,7 +654,15 @@ function load(){
       if(!d.eventos)d.eventos=[];
       if(!d.prs)d.prs={};
       if(!d.kmObjetivoAnual)d.kmObjetivoAnual=1000;
-      if(!d.strava)d.strava={clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''};
+      // Migración: el S.strava viejo (con client_id/secret por usuario) se
+      // descarta — el modelo nuevo es distinto de raíz, no hay tokens
+      // válidos que rescatar de él.
+      if(!d.conexiones)d.conexiones={
+        strava:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+        coros:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+        garmin:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
+      };
+      delete d.strava;
       if(!d.coach)d.coach={genero:'masculino',estilo:'exigente'};
       if(d.athlete){
         if(d.athlete.nivel===undefined)d.athlete.nivel='';
@@ -1873,6 +1890,14 @@ function renderEquipacion(el){
   const totalKmByShoe=(id)=>S.entrenamientos.filter(e=>e.zapatilla!=null&&String(e.zapatilla)===String(id)).reduce((a,e)=>a+e.dist,0);
 
   el.innerHTML=`
+  <!-- PLATAFORMAS CONECTADAS -->
+  <div class="panel">
+    <div class="panel-title">🔗 Plataformas conectadas</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem">Trae tus entrenos automáticamente, sin tener que exportar e importar archivos .FIT a mano.</div>
+    ${renderStravaPanel()}
+    <div style="font-size:11px;color:var(--text3);margin-top:.4rem">COROS y Garmin — próximamente.</div>
+  </div>
+
   <!-- RELOJ -->
   <div class="panel">
     <div class="panel-title">⌚ Reloj GPS</div>
@@ -4479,6 +4504,220 @@ const STRIDE_PROXY_URL='https://stride-proxy-navy.vercel.app/api/anthropic';
 const SUPABASE_URL='https://iybbfheabhvfbtdlgcdf.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_3RxN6g58pWzIdBf98oVWrw_rZk8KmAm';
 const LOCORUNNER_ADMIN_URL='https://locorunner-admin.vercel.app';
+
+/* ============================================================
+   CONEXIÓN CON STRAVA
+   Una sola app de Strava, tuya, compartida por todos los usuarios (así
+   solo tú pagas la suscripción de desarrollador de Strava, no cada uno).
+   El client_secret vive SOLO en stride-proxy — aquí solo el client_id,
+   que es seguro de tener visible (es parte pública del flujo OAuth).
+============================================================ */
+const STRAVA_CLIENT_ID='243915';
+const STRAVA_TOKEN_URL=STRIDE_PROXY_URL.replace('/api/anthropic','/api/strava-token');
+const STRAVA_ACTIVITIES_URL=STRIDE_PROXY_URL.replace('/api/anthropic','/api/strava-activities');
+
+function stravaConnect(){
+  const redirectUri=encodeURIComponent(window.location.origin+window.location.pathname);
+  const scope='read,activity:read_all';
+  window.location.href=`https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&approval_prompt=auto&scope=${scope}`;
+}
+
+// Se llama al arrancar la app: si venimos de vuelta de Strava, la URL trae
+// ?code=... — lo consumimos, intercambiamos por tokens, y limpiamos la URL
+// para que un refresco de página no intente reprocesar el mismo código.
+async function checkStravaCallback(){
+  const params=new URLSearchParams(window.location.search);
+  const code=params.get('code');
+  const err=params.get('error');
+  if(err){
+    window.history.replaceState({},'',window.location.pathname);
+    showToast('Conexión con Strava cancelada','var(--text2)');
+    return;
+  }
+  if(!code) return;
+  window.history.replaceState({},'',window.location.pathname);
+  showToast('Conectando con Strava…','var(--acc)');
+  try{
+    const res=await fetch(STRAVA_TOKEN_URL,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({code})
+    });
+    const data=await res.json();
+    if(!res.ok){ showToast('Error conectando con Strava: '+(data?.error?.message||res.status),'var(--acc3)'); return; }
+    if(!S.conexiones)S.conexiones={strava:{},coros:{},garmin:{}};
+    S.conexiones.strava={
+      conectado:true,
+      accessToken:data.access_token,
+      refreshToken:data.refresh_token,
+      expiresAt:data.expires_at,
+      athleteId:data.athlete?.id?String(data.athlete.id):'',
+      atletaNombre:((data.athlete?.firstname||'')+' '+(data.athlete?.lastname||'')).trim(),
+      lastSync:''
+    };
+    save();
+    showToast('✅ Strava conectado — '+(S.conexiones.strava.atletaNombre||'listo'),'var(--acc)');
+    if(view==='perfil') renderPerfil(document.getElementById('main'));
+  }catch(e){
+    showToast('Error de red conectando con Strava','var(--acc3)');
+  }
+}
+
+function stravaDisconnect(){
+  S.conexiones.strava={conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''};
+  save();
+  showToast('Strava desconectado','var(--text2)');
+  if(view==='perfil') renderPerfil(document.getElementById('main'));
+}
+
+// Comprueba si el token sigue vigente; si no, lo renueva usando el
+// refresh_token. Devuelve un access_token utilizable, o null si falla.
+async function stravaEnsureValidToken(){
+  const c=S.conexiones?.strava;
+  if(!c||!c.conectado) return null;
+  const now=Math.floor(Date.now()/1000);
+  if(c.expiresAt && c.expiresAt>now+60) return c.accessToken;
+  try{
+    const res=await fetch(STRAVA_TOKEN_URL,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:c.refreshToken})
+    });
+    const data=await res.json();
+    if(!res.ok) return null;
+    S.conexiones.strava.accessToken=data.access_token;
+    S.conexiones.strava.refreshToken=data.refresh_token;
+    S.conexiones.strava.expiresAt=data.expires_at;
+    save();
+    return data.access_token;
+  }catch(e){ return null; }
+}
+
+// Mapa de tipo de actividad de Strava -> deporte de Locorunner (mismo
+// vocabulario que usa DEPORTES_LISTA en el resto de la app)
+function stravaTypeToDeporte(tipoStrava){
+  const map={Run:'Running',TrailRun:'Trail',Ride:'Ciclismo',VirtualRide:'Ciclismo',
+    Swim:'Natación',WeightTraining:'Fuerza / Gimnasio',Workout:'Fuerza / Gimnasio',
+    Hike:'Senderismo',Walk:'Senderismo',NordicSki:'Esquí / Snowboard',
+    AlpineSki:'Esquí / Snowboard',Rowing:'Remo',Tennis:'Tenis / Pádel',
+    Soccer:'Fútbol',Basketball:'Baloncesto',Yoga:'Yoga / Pilates'};
+  return map[tipoStrava]||'Otro';
+}
+
+// Convierte una actividad cruda de Strava al formato de entreno de
+// Locorunner. Mismo criterio que fitSportToDeporte/classifyFitTipo para
+// mantener coherencia entre lo importado por .FIT y por Strava.
+function normalizarActividadStrava(act){
+  if(!act.distance||act.distance<=0||!act.moving_time) return null;
+  const dist=parseFloat((act.distance/1000).toFixed(2));
+  const secs=Math.round(act.moving_time);
+  const ritmo=dist>0?(secs/60/dist):0;
+  const deporte=stravaTypeToDeporte(act.type||act.sport_type);
+  const fc=act.average_heartrate?Math.round(act.average_heartrate):null;
+  let cad=act.average_cadence?Math.round(act.average_cadence):null;
+  if(deporte==='Running'&&cad&&cad<110)cad=cad*2; // Strava también reporta pasos de una sola pierna
+  const dn=act.total_elevation_gain?Math.round(act.total_elevation_gain):0;
+  return {
+    id:Date.now()+Math.floor(Math.random()*1000),
+    fecha:isoLocal(new Date(act.start_date_local||act.start_date)),
+    tipo:classifyFitTipo(dist,secs),
+    deporte, dist, secs,
+    ritmo:parseFloat(ritmo.toFixed(3)),
+    fc, cad, zan:null, ts:null, dn, hrz:null, vo2est:null,
+    notas:`Importado de Strava · ${act.name||''}`,
+    origen:'strava', origenId:String(act.id),
+    zapatilla:null
+  };
+}
+
+// Trae actividades nuevas desde la última sincronización (o últimos 30 días
+// si es la primera vez) y las importa, respetando la detección de
+// duplicados — nunca decide sola si hay algo parecido, siempre pregunta.
+async function stravaSync(){
+  const token=await stravaEnsureValidToken();
+  if(!token){ showToast('No se pudo conectar con Strava — prueba a reconectarlo','var(--acc3)'); return; }
+  const btn=document.getElementById('stravaSyncBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Sincronizando…'; }
+  try{
+    const lastSync=S.conexiones.strava.lastSync;
+    const afterTs=lastSync?Math.floor(new Date(lastSync).getTime()/1000):Math.floor((Date.now()-30*86400000)/1000);
+    const res=await fetch(`${STRAVA_ACTIVITIES_URL}?after=${afterTs}&per_page=50`,{
+      headers:{Authorization:'Bearer '+token}
+    });
+    const activities=await res.json();
+    if(!res.ok){ showToast('Error trayendo actividades de Strava','var(--acc3)'); if(btn){btn.disabled=false;btn.textContent='Sincronizar ahora';} return; }
+
+    let importadas=0; const pendientesDup=[];
+    (activities||[]).forEach(act=>{
+      const nuevo=normalizarActividadStrava(act);
+      if(!nuevo) return;
+      if((S.entrenamientos||[]).some(e=>e.origen==='strava'&&e.origenId===nuevo.origenId)) return; // ya sincronizado antes
+      const candidatos=buscarPosiblesDuplicados(nuevo);
+      if(candidatos.length){ pendientesDup.push(nuevo); }
+      else{ S.entrenamientos.push(nuevo); importadas++; }
+    });
+    S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    S.conexiones.strava.lastSync=new Date().toISOString();
+    save();
+
+    if(btn){ btn.disabled=false; btn.textContent='Sincronizar ahora'; }
+    showToast(`✅ ${importadas} entreno${importadas!==1?'s':''} de Strava importado${importadas!==1?'s':''}`+(pendientesDup.length?` · ${pendientesDup.length} por revisar`:''),'var(--acc)');
+    if(view==='perfil') renderPerfil(document.getElementById('main'));
+    resolverDuplicadosPendientes(pendientesDup);
+  }catch(e){
+    if(btn){ btn.disabled=false; btn.textContent='Sincronizar ahora'; }
+    showToast('Error sincronizando con Strava','var(--acc3)');
+  }
+}
+
+// Resuelve, uno a uno, los posibles duplicados detectados en una
+// sincronización — siempre con el modal de confirmación, nunca en silencio.
+function resolverDuplicadosPendientes(lista){
+  if(!lista||!lista.length) return;
+  const nuevo=lista.shift();
+  const candidatos=buscarPosiblesDuplicados(nuevo);
+  if(!candidatos.length){
+    S.entrenamientos.push(nuevo);
+    S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    save();
+    resolverDuplicadosPendientes(lista);
+    return;
+  }
+  mostrarConfirmacionDuplicado(nuevo,candidatos,(decision,existing)=>{
+    if(decision==='distinto'){
+      S.entrenamientos.push(nuevo);
+      S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    } else if(decision==='rellenar'){
+      ['fc','cad','ts','zan','dn'].forEach(campo=>{ if(!existing[campo]&&nuevo[campo])existing[campo]=nuevo[campo]; });
+    }
+    save();
+    if(view==='perfil') renderPerfil(document.getElementById('main'));
+    resolverDuplicadosPendientes(lista);
+  });
+}
+
+function renderStravaPanel(){
+  const c=S.conexiones?.strava;
+  if(c?.conectado){
+    return `
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.85rem;margin-bottom:.6rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+        <div>
+          <div style="font-size:13px;color:var(--text);font-weight:600">🟠 Strava</div>
+          <div style="font-size:11px;color:var(--text3)">${c.atletaNombre?esc(c.atletaNombre):'Conectado'}${c.lastSync?' · última sync: '+fmtD(c.lastSync.slice(0,10)):' · sin sincronizar todavía'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="stravaSyncBtn" class="btn btn-acc" onclick="stravaSync()">Sincronizar ahora</button>
+        <button class="btn btn-ghost" onclick="stravaDisconnect()">Desconectar</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.85rem;margin-bottom:.6rem">
+    <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:2px">🟠 Strava</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.6rem">Trae tus entrenos automáticamente, sin exportar ni importar archivos .FIT a mano.</div>
+    <button class="btn btn-ghost" onclick="stravaConnect()">Conectar con Strava</button>
+  </div>`;
+}
 
 let _sbClient=null;
 function getSbClient(){
@@ -8364,10 +8603,88 @@ function showPostSyncShoeModal(added){
   document.body.appendChild(modal);
 }
 
+/* ============================================================
+   DETECCIÓN DE POSIBLES DUPLICADOS ENTRE FUENTES DISTINTAS
+   Para cuando llegue una actividad de Strava/COROS/Garmin que podría ser
+   la misma que ya tienes metida a mano o importada de .FIT. Tolerancia más
+   amplia que el merge automático de FIT-a-FIT (más arriba en este archivo),
+   porque aquí los datos vienen de sitios distintos y no van a coincidir al
+   milímetro. Por eso aquí SIEMPRE se pregunta, nunca se decide sola —
+   decisión explícita de Héctor.
+
+   Uso previsto (para cuando exista el sincronizador de Strava):
+     const candidatos = buscarPosiblesDuplicados(nuevoEntreno);
+     if(candidatos.length){
+       mostrarConfirmacionDuplicado(nuevoEntreno, candidatos, (decision, existing)=>{
+         if(decision==='mismo') return; // no importar
+         if(decision==='distinto'){ S.entrenamientos.push(nuevoEntreno); save(); }
+         if(decision==='rellenar'){ ...fusionar campos que falten en existing...; save(); }
+       });
+     } else { S.entrenamientos.push(nuevoEntreno); save(); }
+============================================================ */
+function buscarPosiblesDuplicados(nuevo){
+  return S.entrenamientos.filter(e=>{
+    if(e.fecha!==nuevo.fecha) return false;
+    if(!e.dist||!nuevo.dist) return false;
+    const tolKm=Math.max(0.5, e.dist*0.15); // 15% de la distancia o 500m, lo que sea mayor
+    return Math.abs(e.dist-nuevo.dist)<=tolKm;
+  });
+}
+const ORIGEN_LABELS={manual:'Manual',fit:'.FIT',strava:'Strava',coros:'COROS',garmin:'Garmin'};
+function origenLabel(e){
+  if(e.origen) return ORIGEN_LABELS[e.origen]||e.origen;
+  return e.fitImport?'.FIT':'Manual'; // entrenos antiguos, antes de tener el campo origen
+}
+function mostrarConfirmacionDuplicado(nuevo, candidatos, onResolve){
+  document.getElementById('dupModal')?.remove();
+  const existing=candidatos[0];
+  const modal=document.createElement('div');
+  modal.id='dupModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:460px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:19px;letter-spacing:1.5px;color:var(--acc3);margin-bottom:.5rem">¿ES EL MISMO ENTRENO?</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1rem">Tienes ya un entreno muy parecido ese mismo día. Revísalo antes de decidir:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.1rem">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.7rem">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ya tenías</div>
+        <div style="font-size:13px;color:var(--text);font-weight:600">${esc(existing.tipo||'Entreno')}</div>
+        <div style="font-size:12px;color:var(--text2)">${existing.dist}km · ${fmt(existing.ritmo)}/km</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">${origenLabel(existing)}</div>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--acc4)40;border-radius:var(--r2);padding:.7rem">
+        <div style="font-size:10px;color:var(--acc4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Nuevo</div>
+        <div style="font-size:13px;color:var(--text);font-weight:600">${esc(nuevo.tipo||'Entreno')}</div>
+        <div style="font-size:12px;color:var(--text2)">${nuevo.dist}km · ${fmt(nuevo.ritmo)}/km</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px">${origenLabel(nuevo)}</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button data-r="mismo" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">✓ Es el mismo — no lo importes de nuevo</div>
+      </button>
+      <button data-r="rellenar" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">🔧 Es el mismo, pero rellena los datos que falten</div>
+      </button>
+      <button data-r="distinto" style="text-align:left;background:var(--bg3);border:1.5px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;font-family:'Inter'">
+        <div style="font-size:13px;color:var(--text);font-weight:600">↔️ Son entrenos distintos — importa los dos</div>
+      </button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.querySelectorAll('button[data-r]').forEach(b=>b.addEventListener('click',()=>{
+    const r=b.dataset.r;
+    modal.remove();
+    onResolve(r, existing);
+  }));
+}
+
 function assignShoeToRecent(shoeId, count){
   const isDefault=document.getElementById('setAsDefault')?.checked;
   const idInt=shoeId?parseInt(shoeId):null;
-  const unassigned=S.entrenamientos.filter(e=>!e.zapatilla&&(e.stravaId||e.fitImport)).slice(-count);
+  // Cualquier entreno que venga de fuera (FIT, o en el futuro Strava/COROS/Garmin)
+  // y no tenga zapatilla asignada — no solo los de Strava como antes.
+  const unassigned=S.entrenamientos.filter(e=>!e.zapatilla&&(e.fitImport||(e.origen&&e.origen!=='manual'))).slice(-count);
   unassigned.forEach(e=>e.zapatilla=idInt);
   if(isDefault&&idInt){
     if(!S.equipacion) S.equipacion={reloj:{marca:'',modelo:''},zapatillas:[],defaultShoe:null};
@@ -8735,11 +9052,14 @@ function exportData(){
   // Build clean export — strip sensitive credentials
   const safeData = JSON.parse(JSON.stringify(S)); // deep clone
   safeData.apiKey = '';  // never export API key
-  if(safeData.strava){
-    safeData.strava.accessToken  = '';
-    safeData.strava.refreshToken = '';
-    safeData.strava.clientSecret = '';
-    // Keep clientId (not sensitive) and lastSync
+  // Tokens de sesión de relojes/plataformas conectadas: nunca deben viajar
+  // en un backup exportado — cada dispositivo debe reconectar por su cuenta.
+  if(safeData.conexiones){
+    Object.keys(safeData.conexiones).forEach(prov=>{
+      safeData.conexiones[prov].accessToken='';
+      safeData.conexiones[prov].refreshToken='';
+      safeData.conexiones[prov].conectado=false;
+    });
   }
   // Strip base64 shoe photos to keep JSON size manageable
   // (photos are stored separately in the app)
@@ -8866,6 +9186,7 @@ function showLegalDisclaimerReadOnly(){
 
 initTheme();
 initAuthListener();
+checkStravaCallback();
 checkDevModeFromUrl();
 checkObjetivoRecordatorio();
 go('dash');
@@ -8917,7 +9238,13 @@ document.getElementById('importInput').onchange = function(e){
         eventos: data.eventos || [],
         kmObjetivoAnual: data.kmObjetivoAnual || 1000,
         prs: data.prs || {},
-        strava: data.strava || {clientId:'',clientSecret:'',accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+        // Los backups nunca traen tokens válidos (se limpian al exportar) —
+        // cada dispositivo reconecta sus relojes por su cuenta tras restaurar.
+        conexiones: {
+          strava:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+          coros:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+          garmin:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
+        },
         apiKey: data.apiKey || ''
       };
 
