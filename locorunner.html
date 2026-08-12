@@ -337,12 +337,6 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
         <span class="tb-btn-label">Traer mis entrenos</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <div id="importDropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:230px;z-index:500;overflow:hidden">
-        <div id="importDropdownStrava"></div>
-        <button onclick="closeImportDropdown();document.getElementById('fitImportInput').click()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
-          📁 Importar archivo .FIT
-        </button>
-      </div>
     </div>
 
   </div>
@@ -4769,42 +4763,58 @@ function renderStravaPanel(){
 }
 
 // ---- Menú desplegable "Traer mis entrenos" (topbar) ----
+// Se crea como elemento flotante pegado a document.body, NO dentro del
+// topbar — el topbar tiene overflow:hidden (para que no se salga nada del
+// borde en pantallas estrechas), y eso recortaba el desplegable sin importar
+// el z-index. Al vivir fuera, no hay recorte posible.
 function toggleImportDropdown(){
-  const dd=document.getElementById('importDropdown');
-  if(!dd) return;
-  const abierto=dd.style.display!=='none';
-  if(abierto){ closeImportDropdown(); return; }
-  renderImportDropdownStrava();
-  dd.style.display='block';
+  const existing=document.getElementById('importDropdownFloating');
+  if(existing){ closeImportDropdown(); return; }
+  const btn=document.getElementById('btnFitImport');
+  if(!btn) return;
+  const rect=btn.getBoundingClientRect();
+  const dd=document.createElement('div');
+  dd.id='importDropdownFloating';
+  dd.style.cssText=`position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:230px;z-index:2000;overflow:hidden`;
+  dd.innerHTML=buildImportDropdownHtml();
+  document.body.appendChild(dd);
   setTimeout(()=>document.addEventListener('click',closeImportDropdownOnOutsideClick),0);
 }
 function closeImportDropdown(){
-  const dd=document.getElementById('importDropdown');
-  if(dd) dd.style.display='none';
+  document.getElementById('importDropdownFloating')?.remove();
   document.removeEventListener('click',closeImportDropdownOnOutsideClick);
 }
 function closeImportDropdownOnOutsideClick(e){
-  const wrap=document.getElementById('importDropdownWrap');
-  if(wrap && !wrap.contains(e.target)) closeImportDropdown();
+  const dd=document.getElementById('importDropdownFloating');
+  const btn=document.getElementById('btnFitImport');
+  if(dd && !dd.contains(e.target) && e.target!==btn && !btn?.contains(e.target)) closeImportDropdown();
 }
-// Línea de Strava dentro del desplegable — cambia según esté conectado o no
-function renderImportDropdownStrava(){
-  const el=document.getElementById('importDropdownStrava');
-  if(!el) return;
+function buildImportDropdownHtml(){
   const c=S.conexiones?.strava;
+  let stravaHtml;
   if(c?.conectado){
     const pend=(c.pendientesDuplicados||[]).length;
-    el.innerHTML=`
+    stravaHtml=`
     <button onclick="closeImportDropdown();stravaSync()" style="width:100%;text-align:left;background:transparent;border:none;padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
       🟠 Sincronizar Strava ahora
     </button>
     ${pend?`<button onclick="closeImportDropdown();revisarDuplicadosGuardados()" style="width:100%;text-align:left;background:transparent;border:none;padding:8px 12px;cursor:pointer;font-family:'Inter';font-size:11px;color:var(--acc3);display:flex;align-items:center;gap:8px">🔍 ${pend} por revisar</button>`:''}`;
   }else{
-    el.innerHTML=`
+    stravaHtml=`
     <button onclick="closeImportDropdown();stravaConnect()" style="width:100%;text-align:left;background:transparent;border:none;padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
       🟠 Conectar con Strava
     </button>`;
   }
+  return `${stravaHtml}
+    <button onclick="closeImportDropdown();document.getElementById('fitImportInput').click()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      📁 Importar archivo .FIT
+    </button>`;
+}
+// Refresca el contenido si el desplegable está abierto ahora mismo (p.ej.
+// justo después de sincronizar) — si está cerrado, no hace nada.
+function renderImportDropdownStrava(){
+  const dd=document.getElementById('importDropdownFloating');
+  if(dd) dd.innerHTML=buildImportDropdownHtml();
 }
 
 let _sbClient=null;
