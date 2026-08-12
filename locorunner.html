@@ -132,6 +132,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem}
 .panel-title{font-size:9px;letter-spacing:2px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.9rem}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.grid2>*{min-width:0}
 /* Dashboard: fila superior (saludo + mensaje coach) y cuerpo de dos columnas */
 .dash-top{display:grid;grid-template-columns:1fr 1.4fr;gap:1rem;margin-bottom:1rem}
 .dash-body{display:grid;grid-template-columns:1fr 340px;gap:1rem;margin-bottom:1rem;align-items:stretch}
@@ -143,7 +144,9 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
+.grid3>*{min-width:0}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem}
+.grid4>*{min-width:0}
 /* Biomecánica: parrilla 2×2 con las cuatro celdas del mismo tamaño */
 .bio-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
 .bio-grid .cbox{display:flex;flex-direction:column;min-width:0}
@@ -2076,7 +2079,7 @@ function showAddShoeModal(){
       </div>
     </div>
 
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveNewShoe()" style="flex:1;background:var(--c-zan);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR ZAPATILLA</button>
       <button onclick="document.getElementById('addShoeModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
     </div>
@@ -2271,7 +2274,7 @@ function editShoe(id){
       ${si('Km máximos recomendados','es-maxkm',z.maxKm,'number','')}
       ${si('Km previos (antes de Locorunner)','es-kmprev',z.kmPrevios||0,'number','')}
     </div>
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveEditShoe(${z.id})" style="flex:1;background:var(--c-zan);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR</button>
       <button onclick="document.getElementById('editShoeModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
     </div>
@@ -3127,7 +3130,7 @@ function showPRModal(focusKey=''){
       }).join('')}
     </div>
 
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="savePRs()" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:16px;letter-spacing:2px">GUARDAR MARCAS</button>
       <button onclick="document.getElementById('prModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
     </div>
@@ -3219,9 +3222,9 @@ function renderCalendario(el){
 
     <!-- LEFT: Calendar -->
     <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
         <div style="font-family:'Bebas Neue';font-size:22px;letter-spacing:2px;color:var(--acc2)">${monthsFull[calMonth].toUpperCase()} ${calYear}</div>
-        <div style="display:flex;gap:6px;align-items:center">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button onclick="calNav(-1)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);cursor:pointer;font-size:14px">←</button>
           <button onclick="calNav(0)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--acc2);cursor:pointer;font-size:11px;font-family:'Inter'">Hoy</button>
           <button onclick="calNav(1)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);cursor:pointer;font-size:14px">→</button>
@@ -3503,7 +3506,7 @@ function showAddEventModal(prefillDate='', editId=null){
       ${si('Desnivel positivo estimado (m) — opcional','ev-desnivel',ev&&ev.desnivel?ev.desnivel:'','number','0')}
       ${si('Notas','ev-notas',ev?(ev.notas||''):'','text','Objetivo principal · batir marca · probar nueva estrategia · carrera de preparación')}
     </div>
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveEvento(${isEdit?ev.id:'null'})" style="flex:1;background:var(--acc3);color:#fff;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">${isEdit?'GUARDAR CAMBIOS':'GUARDAR EVENTO'}</button>
       ${isEdit?`<button onclick="deleteEvento(${ev.id})" style="background:var(--bg3);border:1px solid var(--acc3)60;border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--acc3);font-size:12px;font-family:'Inter'">🗑 Eliminar</button>`:''}
       <button onclick="document.getElementById('addEvModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
@@ -3622,7 +3625,7 @@ function showAddPastRaceModal(editId=null){
         <textarea id="res-comentario" rows="3" placeholder="Cómo fue, sensaciones, qué te llevas para la próxima…" style="${inputStyle()};resize:vertical;font-family:'Inter',sans-serif">${esc(res?.comentario||'')}</textarea>
       </div>
     </div>
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveEventoConResultado(${isEdit?ev.id:'null'})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">${isEdit?'GUARDAR CAMBIOS':'GUARDAR CARRERA'}</button>
       ${isEdit?`<button onclick="deleteEvento(${ev.id})" style="background:var(--bg3);border:1px solid var(--acc3)60;border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--acc3);font-size:12px;font-family:'Inter'">🗑</button>`:''}
       <button onclick="document.getElementById('addPastRaceModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
@@ -4183,9 +4186,9 @@ function renderList(el){
     </div>
   </div>`:''}
 
-  <div style="display:flex;justify-content:space-between;align-items:center">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
     <div style="font-size:9px;letter-spacing:2px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-transform:uppercase">${E.length} entrenamientos registrados</div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${shoes.length>1?`<select id="bulkShoeSelect" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text2);font-size:11px;outline:none" onchange="bulkAssignShoe(this.value)">
         <option value="">Asignar zapatilla a todos sin asignar…</option>
         ${shoes.map(z=>`<option value="${z.id}">${esc(z.nombre)}</option>`).join('')}
@@ -4654,7 +4657,7 @@ function showTrainDetail(t){
       </div>`:''}
       ${t.sensaciones?`<div style="background:var(--bg3);border-radius:var(--r2);padding:10px 12px;margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">SENSACIONES</div><div style="font-size:12px;color:var(--text2)">${t.sensaciones}</div></div>`:''}
       ${t.notas?`<div style="background:var(--bg3);border-radius:var(--r2);padding:10px 12px;margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">NOTAS</div><div style="font-size:12px;color:var(--text2)">${esc(t.notas)}</div></div>`:''}
-      <div style="display:flex;gap:8px;margin-top:.75rem">
+      <div style="display:flex;gap:8px;margin-top:.75rem;flex-wrap:wrap">
         <button id="detailDelete" title="Borrar este entreno" style="background:transparent;border:1px solid var(--border);border-radius:var(--r2);padding:9px 12px;color:var(--text3);font-size:12px;cursor:pointer;font-family:'Inter'">🗑</button>
         <button id="detailEdit" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:9px;color:var(--text2);font-size:12px;cursor:pointer;font-family:'Inter'">✏️ Editar datos</button>
         <button id="detailAnalyze" style="flex:2;background:var(--acc4)20;border:1px solid var(--acc4)40;border-radius:var(--r2);padding:9px;color:var(--acc4);font-size:12px;cursor:pointer;font-family:'Inter'">💬 Analizar con entrenador</button>
@@ -5752,7 +5755,7 @@ function showApiKeyPanel(){
         style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 40px 9px 12px;color:var(--text);font-family:'JetBrains Mono';font-size:12px;outline:none">
       <button onclick="const i=document.getElementById('apiKeyInput');i.type=i.type==='password'?'text':'password'" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px">👁</button>
     </div>
-    <div style="display:flex;gap:.75rem">
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap">
       <button onclick="saveApiKey()" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR</button>
       ${getApiKey()?`<button onclick="disconnectApi()" style="background:var(--bg3);border:1px solid var(--acc3)50;border-radius:6px;padding:10px 14px;cursor:pointer;color:var(--acc3);font-size:12px;font-family:'Inter'">Desconectar</button>`:''}
       <button onclick="document.getElementById('apiKeyPanel').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
@@ -9200,7 +9203,7 @@ function showComentarioModal(ent, goListAfter){
     <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">${fmtD(ent.fecha)} · ${ent.tipo} · ${ent.dist}km a ${fmt(ent.ritmo)}/km</div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">Cuenta lo que los datos no dicen: viento, calor, cuestas que caminaste, molestias, sensaciones… El entrenador lo tendrá en cuenta al analizar y su valoración será mucho más fiel a la realidad.</div>
     <textarea id="comInput" rows="4" placeholder="Ej: Caminé en las cuestas del km 4 al 6, por eso baja la cadencia. Viento en contra la segunda mitad." style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:10px 12px;color:var(--text);font-size:13px;font-family:'Inter';box-sizing:border-box;resize:vertical">${actual}</textarea>
-    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveComentario(${ent.id},${!!goListAfter})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR COMENTARIO</button>
       <button onclick="closeComentario(${!!goListAfter})" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">${goListAfter?'Ahora no':'Cancelar'}</button>
     </div>
