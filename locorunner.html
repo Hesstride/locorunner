@@ -4671,6 +4671,17 @@ async function stravaSync(silent){
       S.conexiones.strava.pendientesDuplicados.push(...pendientesDup);
       save();
       if(view==='perfil') renderPerfil(document.getElementById('main'));
+      renderImportDropdownStrava();
+      // Solo avisamos si hay algo real que contar — nada de "0 entrenos
+      // nuevos" a diario, eso con el tiempo es ruido que se acaba ignorando.
+      const totalPend=S.conexiones.strava.pendientesDuplicados.length;
+      if(importadas>0 && totalPend>0){
+        showToast(`✅ ${importadas} entreno${importadas!==1?'s':''} nuevo${importadas!==1?'s':''} desde Strava · ${totalPend} por revisar`,'var(--acc)');
+      } else if(importadas>0){
+        showToast(`✅ ${importadas} entreno${importadas!==1?'s':''} nuevo${importadas!==1?'s':''} desde Strava`,'var(--acc)');
+      } else if(totalPend>0){
+        showToast(`🔍 ${totalPend} entreno${totalPend!==1?'s':''} de Strava por revisar — se parecen a otros que ya tienes`,'var(--acc3)');
+      }
       return;
     }
 
@@ -8466,7 +8477,7 @@ function savePerfil(){
   S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
   save();
   updateTopbar();
-  alert('✅ Perfil guardado');
+  showToast('✅ Perfil guardado','var(--acc)');
 }
 
 /* ============================================================
@@ -9316,52 +9327,94 @@ document.getElementById('importInput').onchange = function(e){
       // se bloquea para evitar reiniciar el contador de consultas de la IA.
       const currentDeviceId = getUserId();
       if(parsed.deviceId && parsed.deviceId !== currentDeviceId && !isDevMode()){
-        const code = prompt('⚠️ Este backup pertenece a otro dispositivo.\n\nPor seguridad, no se puede importar aquí — esto evita reiniciar el límite de consultas de la IA abriendo el backup en otro navegador.\n\nSi eres el desarrollador y necesitas hacerlo para pruebas, introduce el código de desarrollador:');
-        if(code !== DEV_OVERRIDE_CODE){
-          showToast('❌ Este backup pertenece a otro dispositivo. Importación bloqueada.','var(--acc3)');
-          return;
-        }
-        showToast('🔓 Código de desarrollador aceptado — importando de todas formas','var(--acc2)');
+        showDevOverridePrompt(()=>{
+          showToast('🔓 Código de desarrollador aceptado — importando de todas formas','var(--acc2)');
+          confirmarImportarBackup(parsed, data);
+        });
+        return;
       }
 
-      if(!confirm(`¿Importar backup del ${parsed._exported ? new Date(parsed._exported).toLocaleDateString('es-ES') : 'archivo'}?\n\n${data.entrenamientos.length} entrenamientos · ${(data.eventos||[]).length} eventos · ${(data.planes||[]).length} planes\n\nEsto reemplazará todos los datos actuales.`))return;
-
-      // Merge all fields carefully
-      S = {
-        isNewUser: false,
-        athlete: data.athlete || {},
-        equipacion: data.equipacion || {reloj:{marca:'',modelo:''},zapatillas:[]},
-        entrenamientos: data.entrenamientos || [],
-        chatHistory: [],  // don't restore chat history for privacy
-        planes: data.planes || [],
-        eventos: data.eventos || [],
-        kmObjetivoAnual: data.kmObjetivoAnual || 1000,
-        prs: data.prs || {},
-        // Los backups nunca traen tokens válidos (se limpian al exportar) —
-        // cada dispositivo reconecta sus relojes por su cuenta tras restaurar.
-        conexiones: {
-          strava:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
-          coros:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
-          garmin:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
-        },
-        apiKey: data.apiKey || ''
-      };
-
-      // Ensure arrays exist
-      if(!S.equipacion.zapatillas) S.equipacion.zapatillas=[];
-      if(!S.equipacion.reloj) S.equipacion.reloj={marca:'',modelo:''};
-
-      save();
-      updateTopbar();
-      updateStravaStatus();
-      showToast(`✅ Importados: ${S.entrenamientos.length} entrenos · ${S.eventos.length} eventos · ${S.planes.length} planes`,'var(--acc)');
-      go('dash');
+      confirmarImportarBackup(parsed, data);
     }catch(err){
       showToast('❌ Error leyendo el archivo JSON: '+err.message,'var(--acc3)');
     }
   };
   reader.readAsText(file); this.value='';
 };
+
+// Modal propio para el código de desarrollador (sustituye al prompt() nativo)
+function showDevOverridePrompt(onSuccess){
+  document.getElementById('devOverrideModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='devOverrideModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:420px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--acc3);margin-bottom:.5rem">⚠️ BACKUP DE OTRO DISPOSITIVO</div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:1rem">Por seguridad, no se puede importar aquí — esto evita reiniciar el límite de consultas de la IA abriendo el backup en otro navegador.<br><br>Si eres el desarrollador y necesitas hacerlo para pruebas, introduce el código:</div>
+    <input id="devOverrideInput" type="password" placeholder="Código de desarrollador" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:1rem">
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('devOverrideModal').remove()" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:6px;padding:9px;cursor:pointer;color:var(--text3);font-size:12px;font-family:'Inter'">Cancelar</button>
+      <button id="devOverrideConfirmBtn" style="flex:1;background:var(--acc2);border:none;border-radius:6px;padding:9px;cursor:pointer;color:#000;font-weight:600;font-size:12px;font-family:'Inter'">Confirmar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('devOverrideConfirmBtn').onclick=()=>{
+    const code=document.getElementById('devOverrideInput').value;
+    modal.remove();
+    if(code!==DEV_OVERRIDE_CODE){
+      showToast('❌ Este backup pertenece a otro dispositivo. Importación bloqueada.','var(--acc3)');
+      return;
+    }
+    onSuccess();
+  };
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+}
+
+// Confirmación de importación (sustituye al confirm() nativo)
+function confirmarImportarBackup(parsed, data){
+  const fechaTxt = parsed._exported ? new Date(parsed._exported).toLocaleDateString('es-ES') : 'archivo';
+  appConfirm(
+    '📥 IMPORTAR BACKUP',
+    `¿Importar backup del ${fechaTxt}?<br><br>${data.entrenamientos.length} entrenamientos · ${(data.eventos||[]).length} eventos · ${(data.planes||[]).length} planes<br><br><strong style="color:var(--acc3)">Esto reemplazará todos los datos actuales.</strong>`,
+    'IMPORTAR',
+    ()=>ejecutarImportarBackup(data),
+    'var(--acc3)'
+  );
+}
+
+function ejecutarImportarBackup(data){
+  // Merge all fields carefully
+  S = {
+    isNewUser: false,
+    athlete: data.athlete || {},
+    equipacion: data.equipacion || {reloj:{marca:'',modelo:''},zapatillas:[]},
+    entrenamientos: data.entrenamientos || [],
+    chatHistory: [],  // don't restore chat history for privacy
+    planes: data.planes || [],
+    eventos: data.eventos || [],
+    kmObjetivoAnual: data.kmObjetivoAnual || 1000,
+    prs: data.prs || {},
+    // Los backups nunca traen tokens válidos (se limpian al exportar) —
+    // cada dispositivo reconecta sus relojes por su cuenta tras restaurar.
+    conexiones: {
+      strava:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+      coros:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''},
+      garmin:{conectado:false,accessToken:'',refreshToken:'',expiresAt:0,athleteId:'',lastSync:''}
+    },
+    apiKey: data.apiKey || ''
+  };
+
+  // Ensure arrays exist
+  if(!S.equipacion.zapatillas) S.equipacion.zapatillas=[];
+  if(!S.equipacion.reloj) S.equipacion.reloj={marca:'',modelo:''};
+
+  save();
+  updateTopbar();
+  updateStravaStatus();
+  showToast(`✅ Importados: ${S.entrenamientos.length} entrenos · ${S.eventos.length} eventos · ${S.planes.length} planes`,'var(--acc)');
+  go('dash');
+}
 </script>
 </body>
 </html>
