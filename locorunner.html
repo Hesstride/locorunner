@@ -746,7 +746,15 @@ function buildAnalisisMsg(t){
   const sens=t.sensaciones?` Sensaciones ese día: ${t.sensaciones.toLowerCase()}.`:'';
   const extra=(com||sens)?` Mi comentario de ese día: "${com}".${sens}`:'';
   const cierre=(com||sens)?' teniendo muy en cuenta mi comentario y sensaciones':'';
-  return `${fmtD(t.fecha)}, ${t.tipo} ${t.dist}km a ${fmt(t.ritmo)}/km — FC ${t.fc||'—'}, cad ${t.cad||'—'}${t.ts?', t.suelo '+t.ts+'ms':''}${t.zan?', zancada '+t.zan+'cm':''}.${extra} Sin listar datos, solo dime qué tal fue${cierre}.`;
+  // Estructura real por tramos (series/tempo) — sin esto, una sesión de
+  // series y un rodaje continuo del mismo km/ritmo medio le llegaban al
+  // coach exactamente iguales, y analizaba mal el entreno.
+  let laps='';
+  if(t.esEstructurado && Array.isArray(t.laps) && t.laps.length){
+    const partes=t.laps.map((l,i)=>`T${i+1}: ${l.distKm}km en ${fmt(l.ritmo)}/km${l.fc?` (FC ${l.fc})`:''}`);
+    laps=` ⚠️ IMPORTANTE — esto NO fue un ritmo uniforme, tiene estructura real por tramos (${t.laps.length}), no lo analices como un rodaje continuo: ${partes.join(' · ')}.`;
+  }
+  return `${fmtD(t.fecha)}, ${t.tipo} ${t.dist}km a ${fmt(t.ritmo)}/km — FC ${t.fc||'—'}, cad ${t.cad||'—'}${t.ts?', t.suelo '+t.ts+'ms':''}${t.zan?', zancada '+t.zan+'cm':''}.${laps}${extra} Sin listar datos, solo dime qué tal fue${cierre}.`;
 }
 
 // Color de acento vigente (lima en oscuro, naranja en claro). Para pintar las gráficas
@@ -3950,7 +3958,7 @@ function renderList(el){
     ${E.map(t=>{
       const s=score(t), sc=scoreClass(s);
       const shoe=shoes.find(z=>t.zapatilla!=null&&String(z.id)===String(t.zapatilla));
-      return`<div class="t-item" style="grid-template-columns:80px 1fr auto auto">
+      return`<div class="t-item" style="grid-template-columns:80px 1fr auto auto auto">
         <div class="t-date" onclick="openTrain(${t.id})" style="cursor:pointer">${fmtD(t.fecha)}<br><span style="font-size:9px;color:${clasificarTipoEntreno(t.tipo).color}">${t.tipo}</span></div>
         <div onclick="openTrain(${t.id})" style="cursor:pointer">
           <div style="font-size:13px;font-weight:700">${t.dist}km · ${fmt(t.ritmo)}/km · ${fmtT(t.secs)}</div>
@@ -3971,6 +3979,7 @@ function renderList(el){
           </select>
         </div>
         <div class="score ${sc}" onclick="showScoreInfo()" style="cursor:help" title="Nota de calidad técnica de este entreno — pulsa para saber cómo se calcula">${s}</div>
+        <button onclick="event.stopPropagation();deleteEntrenamiento(${t.id})" title="Borrar este entreno" style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s" onmouseover="this.style.color='var(--acc3)';this.style.background='var(--acc3)15'" onmouseout="this.style.color='var(--text3)';this.style.background='transparent'">🗑</button>
       </div>`;
     }).join('')}
   </div>`;
@@ -3998,6 +4007,22 @@ function renderList(el){
 }
 
 /* Explicación de la nota de calidad (A+, A, B+, B, C) — antes no se decía en ninguna parte */
+function deleteEntrenamiento(id){
+  const t=S.entrenamientos.find(e=>e.id===id);
+  if(!t) return;
+  appConfirm(
+    '🗑 BORRAR ENTRENAMIENTO',
+    `¿Borrar el entreno del ${fmtD(t.fecha)} (${t.dist}km · ${fmt(t.ritmo)}/km)?<br><br>Esta acción no se puede deshacer.`,
+    'BORRAR',
+    ()=>{
+      S.entrenamientos=S.entrenamientos.filter(e=>e.id!==id);
+      save();
+      go('list');
+      showToast('Entrenamiento borrado','var(--acc3)');
+    },
+    'var(--acc3)'
+  );
+}
 function showScoreInfo(){
   document.getElementById('scoreInfoModal')?.remove();
   const modal=document.createElement('div');
@@ -4377,14 +4402,23 @@ function showTrainDetail(t){
         <div style="font-size:10px;color:var(--text3);margin-bottom:4px">ZONAS FC</div>
         <div style="font-size:12px;color:var(--text2)">${zonas}</div>
       </div>
+      ${t.esEstructurado && Array.isArray(t.laps) && t.laps.length ? `
+      <div style="background:var(--bg3);border-radius:var(--r2);padding:10px 12px;margin-bottom:10px">
+        <div style="font-size:10px;color:var(--acc4);margin-bottom:6px">🏃 ESTRUCTURA POR TRAMOS (${t.laps.length}) — detectado automáticamente, no es un ritmo uniforme</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          ${t.laps.map((l,i)=>`<div style="font-size:11px;color:var(--text2);display:flex;justify-content:space-between"><span>Tramo ${i+1}</span><span>${l.distKm}km · ${fmt(l.ritmo)}/km${l.fc?' · FC '+l.fc:''}</span></div>`).join('')}
+        </div>
+      </div>`:''}
       ${t.sensaciones?`<div style="background:var(--bg3);border-radius:var(--r2);padding:10px 12px;margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">SENSACIONES</div><div style="font-size:12px;color:var(--text2)">${t.sensaciones}</div></div>`:''}
       ${t.notas?`<div style="background:var(--bg3);border-radius:var(--r2);padding:10px 12px;margin-bottom:10px"><div style="font-size:10px;color:var(--text3);margin-bottom:4px">NOTAS</div><div style="font-size:12px;color:var(--text2)">${esc(t.notas)}</div></div>`:''}
       <div style="display:flex;gap:8px;margin-top:.75rem">
+        <button id="detailDelete" title="Borrar este entreno" style="background:transparent;border:1px solid var(--border);border-radius:var(--r2);padding:9px 12px;color:var(--text3);font-size:12px;cursor:pointer;font-family:'Inter'">🗑</button>
         <button id="detailEdit" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:9px;color:var(--text2);font-size:12px;cursor:pointer;font-family:'Inter'">✏️ Editar datos</button>
         <button id="detailAnalyze" style="flex:2;background:var(--acc4)20;border:1px solid var(--acc4)40;border-radius:var(--r2);padding:9px;color:var(--acc4);font-size:12px;cursor:pointer;font-family:'Inter'">💬 Analizar con entrenador</button>
       </div>
     </div>`;
   document.body.appendChild(modal);
+  modal.querySelector('#detailDelete').addEventListener('click', ()=>{ modal.remove(); deleteEntrenamiento(t.id); });
 
   modal.querySelector('#detailClose').addEventListener('click', ()=>modal.remove());
   modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
@@ -7525,7 +7559,7 @@ REGLAS DE DISTRIBUCIÓN:
 - Al menos 1 día de descanso completo
 - No poner calidad (series/tempo) el día antes de fuerza intensa
 - No dos días de calidad seguidos sin al menos un día de rodaje suave o descanso entre medias
-- En ${phase==='TAPERING'?'TAPERING: reducir 35-40% volumen, 1 sola sesión de calidad corta':phase==='PRE-COMPETICIÓN'?'PRE-COMPETICIÓN: frescura máxima, solo activaciones':'CONSTRUCCIÓN/BASE: progresión gradual'}
+- En ${phase==='TAPERING'?'TAPERING: reducir 35-40% volumen, 1 sola sesión de calidad corta':phase==='PRE-COMPETICIÓN'?'PRE-COMPETICIÓN: frescura máxima, solo activaciones':phase==='AFINAMIENTO'?'AFINAMIENTO: mantener 1-2 sesiones de calidad (series/tempo) a ritmo objetivo de carrera — es la fase clave para consolidarlo, no reducirlas todavía; empezar a bajar volumen total poco a poco':'CONSTRUCCIÓN/BASE: progresión gradual'}
 - Distribuir el volumen de forma sensata (no tirada larga el lunes si hay carrera el domingo)
 - La semana debe leerse como una progresión con lógica: cada sesión existe por una razón ligada a la fase y a lo que viene antes/después, no como piezas intercambiables
 
@@ -8527,6 +8561,36 @@ function computeHrzFromRecords(records, fcmax){
   return pct;
 }
 
+/* ============================================================
+   ESTRUCTURA POR VUELTAS (series/intervalos) — el parser de FIT ya
+   traía data.laps, pero la app nunca lo usaba: solo leía el resumen
+   total (session), así que una sesión de series y un rodaje continuo
+   del mismo km/ritmo medio le llegaban al coach EXACTAMENTE iguales.
+   Esto extrae cada tramo real (distancia/ritmo/FC) y detecta si hay
+   varianza de ritmo suficiente para ser series, no solo autolaps de
+   un rodaje uniforme.
+============================================================ */
+function detectarEstructuraLaps(laps){
+  if(!laps||laps.length<2) return null;
+  const validas=laps
+    .filter(l=>l.total_distance>0 && (l.total_elapsed_time||l.total_timer_time)>0)
+    .map(l=>{
+      const distKm=l.total_distance/1000;
+      const secs=Math.round(l.total_elapsed_time||l.total_timer_time);
+      const ritmo=secs/60/distKm; // min/km
+      const fc=l.avg_heart_rate?Math.round(l.avg_heart_rate):null;
+      return {distKm:parseFloat(distKm.toFixed(2)), secs, ritmo:parseFloat(ritmo.toFixed(2)), fc};
+    });
+  if(validas.length<2) return null;
+  const ritmos=validas.map(l=>l.ritmo);
+  const minR=Math.min(...ritmos), maxR=Math.max(...ritmos);
+  // Más de 1 min/km de diferencia entre el tramo más rápido y el más lento,
+  // con al menos 3 tramos: es estructura real (series/tempo con recuperación),
+  // no simples autolaps de 1km de un rodaje a ritmo uniforme.
+  const esEstructurado = validas.length>=3 && (maxR-minR)>1.0;
+  return {laps:validas, esEstructurado};
+}
+
 // Traduce el campo 'sport' del FIT a nuestra lista de deportes
 function fitSportToDeporte(sport){
   const map={
@@ -8597,6 +8661,8 @@ async function handleFitFiles(fileList){
       const dn=session.total_ascent?Math.round(session.total_ascent):0;
       // Zonas FC reales calculadas a partir de las muestras de pulso del archivo
       const hrz=computeHrzFromRecords(data.records, S.athlete?.fcmax);
+      // Estructura real por vueltas (series/tempo) — antes se ignoraba del todo
+      const estructura=detectarEstructuraLaps(data.laps);
 
       // Duplicado: no lo saltamos sin más — si al entreno existente le faltan datos, se rellenan
       const existing=S.entrenamientos.find(e=>e.fecha===fecha&&Math.abs(e.dist-dist)<0.1);
@@ -8608,6 +8674,7 @@ async function handleFitFiles(fileList){
         if(!existing.ts&&ts){existing.ts=ts;enriched=true;}
         if(!existing.zan&&zan){existing.zan=zan;enriched=true;}
         if((!existing.dn||existing.dn===0)&&dn){existing.dn=dn;enriched=true;}
+        if(!existing.laps&&estructura){existing.laps=estructura.laps;existing.esEstructurado=estructura.esEstructurado;enriched=true;}
         if(enriched)updated++; else skipped++;
         continue;
       }
@@ -8626,6 +8693,8 @@ async function handleFitFiles(fileList){
         dn,
         hrz,
         vo2est:null,
+        laps:estructura?estructura.laps:null,
+        esEstructurado:estructura?estructura.esEstructurado:false,
         notas:`Importado de .FIT · ${file.name}`,
         fitImport:true,
         zapatilla:null
