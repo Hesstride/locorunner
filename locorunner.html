@@ -7835,6 +7835,7 @@ REGLAS DE DISTRIBUCIÓN:
 - La semana debe leerse como una progresión con lógica: cada sesión existe por una razón ligada a la fase y a lo que viene antes/después, no como piezas intercambiables
 
 FORMATO OBLIGATORIO (una sección por día):
+⛔ Cada día empieza EXACTAMENTE con tres almohadillas "### " — nunca con una "#" ni con dos "##", ni siquiera en el día de descanso. Si un solo día no lleva las tres, el sistema que separa esto no sabe dónde corta y se rompe todo el plan.
 
 ## 📅 PLAN SEMANAL · ${week[0].date} – ${week[6].date}
 
@@ -7877,9 +7878,15 @@ ${week.map(w=>`### ${w.day.toUpperCase()} ${fmtD(w.date)}
     // "Mis Planes" (ver renderPlanes) para no ensuciar esa lista con descansos.
     if(!S.planes) S.planes=[];
     let saved=0, savedRest=0;
+    // Límite entre días: reconoce el nombre de CUALQUIER día con 1 a 3
+    // almohadillas — antes exigía "###" exacto, y si la IA escribía un día
+    // con "#" o "##" (variación real observada), ese día entero se colaba
+    // dentro del día anterior en vez de quedar separado. Este patrón es el
+    // mismo, ya probado, que usa parseWeeklyPlanFromText() para el chat libre.
+    const diaBoundary='LUNES|MARTES|MI[ÉE]RCOLES|JUEVES|VIERNES|S[ÁA]BADO|DOMINGO';
     week.forEach(w=>{
       // Extract day section from reply
-      const dayRegex=new RegExp(`###\\s*${w.day.toUpperCase()}[^\\n]*\\n([\\s\\S]*?)(?=###|##\\s*📊|$)`,'i');
+      const dayRegex=new RegExp(`#{1,3}\\s*${w.day.toUpperCase()}[^\\n]*\\n([\\s\\S]*?)(?=\\n\\s*#{1,3}\\s*(?:${diaBoundary})\\b|\\n#{1,3}\\s*📊|$)`,'i');
       const match=reply.match(dayRegex);
       if(match&&match[1].trim().length>5){
         const contenido=match[1].trim();
