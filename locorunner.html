@@ -3224,7 +3224,9 @@ function renderCalendario(el){
           <button onclick="calNav(-1)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);cursor:pointer;font-size:14px">←</button>
           <button onclick="calNav(0)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--acc2);cursor:pointer;font-size:11px;font-family:'Inter'">Hoy</button>
           <button onclick="calNav(1)" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);cursor:pointer;font-size:14px">→</button>
-          <button onclick="showAddEventModal()" class="btn btn-acc" style="font-size:11px;margin-left:8px">+ Añadir evento</button>
+          <div id="addEvDropdownWrap" style="position:relative;margin-left:8px">
+            <button id="btnAddEv" onclick="toggleAddEvDropdown()" class="btn btn-acc" style="font-size:11px">+ Añadir evento ▾</button>
+          </div>
         </div>
       </div>
 
@@ -3300,6 +3302,9 @@ function renderCalendario(el){
           </div>`;
         }).join('')}
       </div>
+
+      <!-- Carreras realizadas -->
+      ${buildCarrerasRealizadasPanel()}
 
       <!-- Próximos 7 días -->
       <div class="panel" style="padding:.9rem">
@@ -3434,6 +3439,38 @@ function showEmptyDayMenu(dateStr){
   });
 }
 
+// ---- Desplegable "+ Añadir evento" (evento futuro / carrera pasada) ----
+// Mismo patrón flotante que "Traer mis entrenos" del topbar — evita
+// cualquier problema de recorte por overflow del contenedor padre.
+function toggleAddEvDropdown(){
+  const existing=document.getElementById('addEvDropdownFloating');
+  if(existing){ closeAddEvDropdown(); return; }
+  const btn=document.getElementById('btnAddEv');
+  if(!btn) return;
+  const rect=btn.getBoundingClientRect();
+  const dd=document.createElement('div');
+  dd.id='addEvDropdownFloating';
+  dd.style.cssText=`position:fixed;top:${rect.bottom+6}px;right:${window.innerWidth-rect.right}px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:230px;z-index:2000;overflow:hidden`;
+  dd.innerHTML=`
+    <button onclick="closeAddEvDropdown();showAddEventModal()" style="width:100%;text-align:left;background:transparent;border:none;padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      📅 Evento próximo
+    </button>
+    <button onclick="closeAddEvDropdown();showAddPastRaceModal()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      🏁 Carrera pasada (con resultado)
+    </button>`;
+  document.body.appendChild(dd);
+  setTimeout(()=>document.addEventListener('click',closeAddEvDropdownOnOutsideClick),0);
+}
+function closeAddEvDropdown(){
+  document.getElementById('addEvDropdownFloating')?.remove();
+  document.removeEventListener('click',closeAddEvDropdownOnOutsideClick);
+}
+function closeAddEvDropdownOnOutsideClick(e){
+  const dd=document.getElementById('addEvDropdownFloating');
+  const btn=document.getElementById('btnAddEv');
+  if(dd && !dd.contains(e.target) && e.target!==btn && !btn?.contains(e.target)) closeAddEvDropdown();
+}
+
 function showAddEventModal(prefillDate='', editId=null){
   document.getElementById('addEvModal')?.remove();
   const ev = editId!=null ? (S.eventos||[]).find(e=>String(e.id)===String(editId)) : null;
@@ -3507,11 +3544,207 @@ function deleteEvento(id){
   const ev=(S.eventos||[]).find(e=>String(e.id)===String(id));
   appConfirm('🗑 ELIMINAR EVENTO',`¿Seguro que quieres eliminar <strong style="color:var(--text)">${ev?ev.nombre:'este evento'}</strong>? Esta acción no se puede deshacer.`,'ELIMINAR',()=>{
     S.eventos=(S.eventos||[]).filter(e=>String(e.id)!==String(id));
+    // Si tenía resultado, también se borra el entreno espejo que se creó a partir de él
+    S.entrenamientos=(S.entrenamientos||[]).filter(e=>e.origenEventoId!==id);
     save();
     document.getElementById('addEvModal')?.remove();
+    document.getElementById('addPastRaceModal')?.remove();
     showToast('Evento eliminado','var(--text3)');
     go('calendario');
   });
+}
+
+/* ============================================================
+   CARRERAS REALIZADAS
+   Reutiliza S.eventos — una carrera "completada" es el mismo evento con
+   un campo `resultado` añadido, no una tabla aparte (evita desincronizar
+   dos copias de la misma carrera). Al guardar un resultado, se crea/
+   actualiza automáticamente un entreno espejo (tipo "Carrera") para que
+   entre solo en la proyección de tiempo, los récords y el historial que
+   ya lee el entrenador — sin tocar esos sistemas de nuevo.
+============================================================ */
+function parseTiempoCarrera(){
+  const h=parseInt(document.getElementById('res-h')?.value)||0;
+  const m=parseInt(document.getElementById('res-m')?.value)||0;
+  const s=parseInt(document.getElementById('res-s')?.value)||0;
+  const total=h*3600+m*60+s;
+  return total>0?total:null;
+}
+function showAddPastRaceModal(editId=null){
+  document.getElementById('addPastRaceModal')?.remove();
+  const ev = editId!=null ? (S.eventos||[]).find(e=>String(e.id)===String(editId)) : null;
+  const isEdit = !!ev;
+  const res = ev?.resultado;
+  const th = res?.tiempoSecs ? Math.floor(res.tiempoSecs/3600) : '';
+  const tm = res?.tiempoSecs ? Math.floor((res.tiempoSecs%3600)/60) : '';
+  const ts = res?.tiempoSecs ? res.tiempoSecs%60 : '';
+  const modal=document.createElement('div');
+  modal.id='addPastRaceModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:1001;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:440px;width:100%;max-height:90vh;overflow-y:auto;animation:fadeInUp .25s ease">
+    <div style="font-family:'Bebas Neue';font-size:20px;letter-spacing:2px;color:var(--acc);margin-bottom:.4rem">🏁 ${isEdit?'EDITAR CARRERA':'CARRERA PASADA'}</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:1.1rem">Se guarda como evento con resultado — el tiempo entra automáticamente en tu histórico y en el cálculo de proyecciones futuras.</div>
+    <div style="display:flex;flex-direction:column;gap:.75rem">
+      ${si('Nombre de la carrera','ev-nombre',ev?ev.nombre:'','text','Media Maratón de…')}
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Fecha</div>
+        <input type="date" id="ev-fecha" value="${ev?ev.fecha:hoyISO()}" max="${hoyISO()}" style="${inputStyle()}">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Tipo</div>
+          <select id="ev-tipo" style="${selStyle()}">
+            ${['Asfalto','Trail','Mixta','Cross/Campo','Pista','Montaña'].map(t=>`<option${ev&&ev.tipo===t?' selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Distancia</div>
+          <select id="ev-dist" style="${selStyle()}">
+            ${['5K','10K','15K','Media Maratón','Maratón','50K','100K','Otra'].map(d=>`<option${ev&&ev.dist===d?' selected':''}>${d}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${si('Desnivel positivo (m) — opcional','ev-desnivel',ev&&ev.desnivel?ev.desnivel:'','number','0')}
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Tu tiempo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="res-h" min="0" max="99" value="${th}" placeholder="h" style="${inputStyle()};text-align:center">
+          <span style="color:var(--text3)">:</span>
+          <input type="number" id="res-m" min="0" max="59" value="${tm}" placeholder="mm" style="${inputStyle()};text-align:center">
+          <span style="color:var(--text3)">:</span>
+          <input type="number" id="res-s" min="0" max="59" value="${ts}" placeholder="ss" style="${inputStyle()};text-align:center">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Comentario — opcional</div>
+        <textarea id="res-comentario" rows="3" placeholder="Cómo fue, sensaciones, qué te llevas para la próxima…" style="${inputStyle()};resize:vertical;font-family:'Inter',sans-serif">${esc(res?.comentario||'')}</textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem;margin-top:1.25rem">
+      <button onclick="saveEventoConResultado(${isEdit?ev.id:'null'})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">${isEdit?'GUARDAR CAMBIOS':'GUARDAR CARRERA'}</button>
+      ${isEdit?`<button onclick="deleteEvento(${ev.id})" style="background:var(--bg3);border:1px solid var(--acc3)60;border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--acc3);font-size:12px;font-family:'Inter'">🗑</button>`:''}
+      <button onclick="document.getElementById('addPastRaceModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function saveEventoConResultado(editId=null){
+  const nombre=document.getElementById('ev-nombre')?.value?.trim();
+  if(!nombre){showToast('⚠️ Escribe el nombre de la carrera','var(--acc3)');return;}
+  const fecha=document.getElementById('ev-fecha')?.value||'';
+  if(!fecha){showToast('⚠️ Indica la fecha de la carrera','var(--acc3)');return;}
+  const tiempoSecs=parseTiempoCarrera();
+  if(!tiempoSecs){showToast('⚠️ Indica tu tiempo (al menos minutos o segundos)','var(--acc3)');return;}
+  const datos={
+    nombre,
+    fecha,
+    tipo:document.getElementById('ev-tipo')?.value||'Asfalto',
+    dist:document.getElementById('ev-dist')?.value||'Media Maratón',
+    desnivel:parseFloat(document.getElementById('ev-desnivel')?.value)||0,
+    resultado:{
+      corrida:true,
+      tiempoSecs,
+      comentario:document.getElementById('res-comentario')?.value?.trim()||'',
+      fechaRegistro:new Date().toISOString()
+    }
+  };
+  if(!S.eventos)S.eventos=[];
+  let evento;
+  if(editId!=null){
+    evento=S.eventos.find(e=>String(e.id)===String(editId));
+    if(evento) Object.assign(evento,datos);
+  } else {
+    evento={id:Date.now(),...datos};
+    S.eventos.push(evento);
+  }
+  sincronizarEntrenoDesdeCarrera(evento);
+  save();
+  document.getElementById('addPastRaceModal')?.remove();
+  showToast(`✅ Carrera guardada: ${nombre} · ${fmtTiempoCarrera(tiempoSecs)}`,'var(--acc)');
+  go('calendario');
+}
+// Crea o actualiza el entreno espejo de una carrera con resultado — así
+// entra solo en proyección/récords/historial sin tocar esos sistemas.
+function sincronizarEntrenoDesdeCarrera(evento){
+  if(!evento?.resultado?.corrida || !evento.resultado.tiempoSecs) return;
+  const distKm=distanciaEventoKm(evento);
+  if(!distKm) return; // "Otra" sin distancia reconocible en el nombre: no se puede calcular ritmo
+  const secs=evento.resultado.tiempoSecs;
+  const ritmo=secs/60/distKm;
+  const deporte=(evento.tipo==='Trail'||evento.tipo==='Montaña')?'Trail':'Running';
+  const notas=`Carrera: ${evento.nombre}${evento.resultado.comentario?' — '+evento.resultado.comentario:''}`;
+  const datos={
+    fecha:evento.fecha, tipo:'Carrera', deporte, dist:distKm, secs,
+    ritmo:parseFloat(ritmo.toFixed(3)), dn:evento.desnivel||0, notas,
+    origen:'carrera', origenEventoId:evento.id
+  };
+  if(!S.entrenamientos)S.entrenamientos=[];
+  const existing=S.entrenamientos.find(e=>e.origenEventoId===evento.id);
+  if(existing){ Object.assign(existing,datos); }
+  else{
+    S.entrenamientos.push({id:Date.now()+1,fc:null,cad:null,ts:null,zan:null,hrz:null,vo2est:null,zapatilla:null,...datos});
+  }
+  S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+}
+
+// Aviso automático: al pasar la fecha de un evento sin resultado registrado
+// aún, se pregunta si se corrió. Como mucho una vez al día por carrera
+// (mismo criterio que el mensaje diario), nunca se pierde si se ignora.
+function checkCarrerasPendientes(){
+  const hoyStr=hoyISO();
+  const pendiente=(S.eventos||[]).find(e=>e.fecha<hoyStr && !e.resultado && e.ultimoRecordatorio!==hoyStr);
+  if(!pendiente) return;
+  pendiente.ultimoRecordatorio=hoyStr;
+  save();
+  setTimeout(()=>showCarreraCheckin(pendiente),1500);
+}
+function showCarreraCheckin(evento){
+  if(document.getElementById('carreraCheckinModal')) return;
+  const modal=document.createElement('div');
+  modal.id='carreraCheckinModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:400px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:19px;letter-spacing:1.5px;color:var(--acc);margin-bottom:.5rem">🏁 ¿CORRISTE ESTA CARRERA?</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:1.1rem"><strong style="color:var(--text)">${esc(evento.nombre)}</strong> — ${fmtD(evento.fecha)}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="document.getElementById('carreraCheckinModal').remove();showAddPastRaceModal(${evento.id})" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">SÍ, PONER MI TIEMPO</button>
+      <button onclick="marcarCarreraNoCorrida(${evento.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Inter'">No la corrí</button>
+      <button onclick="document.getElementById('carreraCheckinModal').remove()" style="background:transparent;border:none;padding:6px;cursor:pointer;color:var(--text3);font-size:11px;font-family:'Inter'">Ahora no, pregúntame otro día</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function marcarCarreraNoCorrida(id){
+  const ev=(S.eventos||[]).find(e=>String(e.id)===String(id));
+  if(ev){ ev.resultado={corrida:false}; save(); }
+  document.getElementById('carreraCheckinModal')?.remove();
+  showToast('Registrado — sin problema, será la próxima','var(--text2)');
+}
+
+// Panel "Carreras realizadas" — cronológico, más reciente primero
+function buildCarrerasRealizadasPanel(){
+  const corridas=(S.eventos||[])
+    .filter(e=>e.resultado?.corrida && e.resultado.tiempoSecs)
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  if(!corridas.length) return '';
+  return `
+  <div class="panel" style="padding:.9rem">
+    <div class="panel-title" style="margin-bottom:.75rem">🏁 Carreras realizadas</div>
+    ${corridas.map(ev=>{
+      const distKm=distanciaEventoKm(ev);
+      const ritmoTxt=distKm?ritmoDe(ev.resultado.tiempoSecs,distKm):'';
+      return`<div onclick="showAddPastRaceModal(${ev.id})" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.65rem .75rem;margin-bottom:.5rem;cursor:pointer" onmouseover="this.style.borderColor='var(--acc)50'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div style="font-size:12px;font-weight:700;color:var(--text)">${esc(ev.nombre)}</div>
+          <div style="font-family:'Bebas Neue';font-size:16px;color:var(--acc);letter-spacing:.5px">${fmtTiempoCarrera(ev.resultado.tiempoSecs)}</div>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${fmtD(ev.fecha)} · ${ev.dist}${ritmoTxt?' · '+ritmoTxt:''}</div>
+        ${ev.resultado.comentario?`<div style="font-size:10px;color:var(--text2);font-style:italic;margin-top:4px">${esc(ev.resultado.comentario)}</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderFC(el){
@@ -9434,6 +9667,7 @@ checkStravaCallback();
 autoSyncStravaIfNeeded();
 checkDevModeFromUrl();
 checkObjetivoRecordatorio();
+checkCarrerasPendientes();
 go('dash');
 updateTopbar();
 updateStravaStatus();
