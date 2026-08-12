@@ -331,10 +331,19 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span class="tb-btn-label">INTRODUCIR MIS DATOS</span>
     </button>
-    <button id="btnFitImport" onclick="document.getElementById('fitImportInput').click()" title="Importar entrenamientos desde archivos .FIT (COROS, Garmin, etc.)" style="background:var(--c-zan);border:none;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:6px;color:#000;font-weight:600;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      <span class="tb-btn-label">Importar entrenamiento</span>
-    </button>
+    <div id="importDropdownWrap" style="position:relative">
+      <button id="btnFitImport" onclick="toggleImportDropdown()" title="Traer tus entrenos: conectar Strava o importar un archivo .FIT" style="background:var(--c-zan);border:none;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:11px;font-family:'Inter';display:flex;align-items:center;gap:6px;color:#000;font-weight:600;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span class="tb-btn-label">Traer mis entrenos</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="importDropdown" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:230px;z-index:500;overflow:hidden">
+        <div id="importDropdownStrava"></div>
+        <button onclick="closeImportDropdown();document.getElementById('fitImportInput').click()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+          📁 Importar archivo .FIT
+        </button>
+      </div>
+    </div>
 
   </div>
 </div>
@@ -922,6 +931,7 @@ function updateTopbar(){
   const a=S.athlete;
   const navCoach=document.getElementById('navCoachLabel');
   if(navCoach) navCoach.textContent='Hablar con '+coachNombre();
+  renderImportDropdownStrava();
   const chip=document.getElementById('chipProfile');
   const relojChip=document.getElementById('chipReloj');
   const setupBtn=document.getElementById('btnSetup');
@@ -4631,9 +4641,13 @@ function normalizarActividadStrava(act){
 // Trae actividades nuevas desde la última sincronización (o últimos 30 días
 // si es la primera vez) y las importa, respetando la detección de
 // duplicados — nunca decide sola si hay algo parecido, siempre pregunta.
-async function stravaSync(){
+// silent=true: para la sincronización automática en segundo plano — importa
+// lo que está claro, pero NO interrumpe con el modal de duplicados; los dudosos
+// se guardan en S.conexiones.strava.pendientesDuplicados para revisar cuando
+// el usuario quiera (nunca se pierden, solo se posponen).
+async function stravaSync(silent){
   const token=await stravaEnsureValidToken();
-  if(!token){ showToast('No se pudo conectar con Strava — prueba a reconectarlo','var(--acc3)'); return; }
+  if(!token){ if(!silent)showToast('No se pudo conectar con Strava — prueba a reconectarlo','var(--acc3)'); return; }
   const btn=document.getElementById('stravaSyncBtn');
   if(btn){ btn.disabled=true; btn.textContent='Sincronizando…'; }
   try{
@@ -4643,7 +4657,7 @@ async function stravaSync(){
       headers:{Authorization:'Bearer '+token}
     });
     const activities=await res.json();
-    if(!res.ok){ showToast('Error trayendo actividades de Strava','var(--acc3)'); if(btn){btn.disabled=false;btn.textContent='Sincronizar ahora';} return; }
+    if(!res.ok){ if(!silent)showToast('Error trayendo actividades de Strava','var(--acc3)'); if(btn){btn.disabled=false;btn.textContent='Sincronizar ahora';} return; }
 
     let importadas=0; const pendientesDup=[];
     (activities||[]).forEach(act=>{
@@ -4656,16 +4670,49 @@ async function stravaSync(){
     });
     S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
     S.conexiones.strava.lastSync=new Date().toISOString();
-    save();
 
+    if(silent){
+      // Se acumulan (no se pierden) para cuando el usuario quiera revisarlos
+      if(!Array.isArray(S.conexiones.strava.pendientesDuplicados)) S.conexiones.strava.pendientesDuplicados=[];
+      S.conexiones.strava.pendientesDuplicados.push(...pendientesDup);
+      save();
+      if(view==='perfil') renderPerfil(document.getElementById('main'));
+      return;
+    }
+
+    save();
     if(btn){ btn.disabled=false; btn.textContent='Sincronizar ahora'; }
     showToast(`✅ ${importadas} entreno${importadas!==1?'s':''} de Strava importado${importadas!==1?'s':''}`+(pendientesDup.length?` · ${pendientesDup.length} por revisar`:''),'var(--acc)');
     if(view==='perfil') renderPerfil(document.getElementById('main'));
-    resolverDuplicadosPendientes(pendientesDup);
+    // Junto con lo nuevo, resuelve también cualquier pendiente de una sincronización
+    // silenciosa anterior que aún no se hubiera revisado.
+    const pendientesGuardados=S.conexiones.strava.pendientesDuplicados||[];
+    S.conexiones.strava.pendientesDuplicados=[];
+    resolverDuplicadosPendientes([...pendientesGuardados,...pendientesDup]);
   }catch(e){
     if(btn){ btn.disabled=false; btn.textContent='Sincronizar ahora'; }
-    showToast('Error sincronizando con Strava','var(--acc3)');
+    if(!silent)showToast('Error sincronizando con Strava','var(--acc3)');
   }
+}
+
+// Se llama al arrancar la app: sincroniza como mucho 1 vez al día por
+// dispositivo, aunque se abra la app muchas veces — mismo criterio que el
+// mensaje diario del coach (dailyMsgSignature). Nunca interrumpe (silent=true).
+function autoSyncStravaIfNeeded(){
+  const c=S.conexiones?.strava;
+  if(!c||!c.conectado) return;
+  const hoy=hoyISO();
+  const ultimoDia=c.lastSync?c.lastSync.slice(0,10):'';
+  if(ultimoDia===hoy) return; // ya sincronizado hoy
+  stravaSync(true);
+}
+
+function revisarDuplicadosGuardados(){
+  const pendientes=S.conexiones?.strava?.pendientesDuplicados||[];
+  S.conexiones.strava.pendientesDuplicados=[];
+  save();
+  if(view==='perfil') renderPerfil(document.getElementById('main'));
+  resolverDuplicadosPendientes([...pendientes]);
 }
 
 // Resuelve, uno a uno, los posibles duplicados detectados en una
@@ -4697,6 +4744,7 @@ function resolverDuplicadosPendientes(lista){
 function renderStravaPanel(){
   const c=S.conexiones?.strava;
   if(c?.conectado){
+    const pend=(c.pendientesDuplicados||[]).length;
     return `
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.85rem;margin-bottom:.6rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
@@ -4705,6 +4753,7 @@ function renderStravaPanel(){
           <div style="font-size:11px;color:var(--text3)">${c.atletaNombre?esc(c.atletaNombre):'Conectado'}${c.lastSync?' · última sync: '+fmtD(c.lastSync.slice(0,10)):' · sin sincronizar todavía'}</div>
         </div>
       </div>
+      ${pend?`<button onclick="revisarDuplicadosGuardados()" style="width:100%;text-align:left;background:var(--acc3)12;border:1px solid var(--acc3)40;border-radius:8px;padding:8px 10px;margin-bottom:.6rem;cursor:pointer;font-family:'Inter';color:var(--acc3);font-size:12px">🔍 ${pend} entreno${pend!==1?'s':''} por revisar — ¿son duplicados?</button>`:''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button id="stravaSyncBtn" class="btn btn-acc" onclick="stravaSync()">Sincronizar ahora</button>
         <button class="btn btn-ghost" onclick="stravaDisconnect()">Desconectar</button>
@@ -4717,6 +4766,45 @@ function renderStravaPanel(){
     <div style="font-size:11px;color:var(--text3);margin-bottom:.6rem">Trae tus entrenos automáticamente, sin exportar ni importar archivos .FIT a mano.</div>
     <button class="btn btn-ghost" onclick="stravaConnect()">Conectar con Strava</button>
   </div>`;
+}
+
+// ---- Menú desplegable "Traer mis entrenos" (topbar) ----
+function toggleImportDropdown(){
+  const dd=document.getElementById('importDropdown');
+  if(!dd) return;
+  const abierto=dd.style.display!=='none';
+  if(abierto){ closeImportDropdown(); return; }
+  renderImportDropdownStrava();
+  dd.style.display='block';
+  setTimeout(()=>document.addEventListener('click',closeImportDropdownOnOutsideClick),0);
+}
+function closeImportDropdown(){
+  const dd=document.getElementById('importDropdown');
+  if(dd) dd.style.display='none';
+  document.removeEventListener('click',closeImportDropdownOnOutsideClick);
+}
+function closeImportDropdownOnOutsideClick(e){
+  const wrap=document.getElementById('importDropdownWrap');
+  if(wrap && !wrap.contains(e.target)) closeImportDropdown();
+}
+// Línea de Strava dentro del desplegable — cambia según esté conectado o no
+function renderImportDropdownStrava(){
+  const el=document.getElementById('importDropdownStrava');
+  if(!el) return;
+  const c=S.conexiones?.strava;
+  if(c?.conectado){
+    const pend=(c.pendientesDuplicados||[]).length;
+    el.innerHTML=`
+    <button onclick="closeImportDropdown();stravaSync()" style="width:100%;text-align:left;background:transparent;border:none;padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      🟠 Sincronizar Strava ahora
+    </button>
+    ${pend?`<button onclick="closeImportDropdown();revisarDuplicadosGuardados()" style="width:100%;text-align:left;background:transparent;border:none;padding:8px 12px;cursor:pointer;font-family:'Inter';font-size:11px;color:var(--acc3);display:flex;align-items:center;gap:8px">🔍 ${pend} por revisar</button>`:''}`;
+  }else{
+    el.innerHTML=`
+    <button onclick="closeImportDropdown();stravaConnect()" style="width:100%;text-align:left;background:transparent;border:none;padding:10px 12px;cursor:pointer;font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      🟠 Conectar con Strava
+    </button>`;
+  }
 }
 
 let _sbClient=null;
@@ -9187,6 +9275,7 @@ function showLegalDisclaimerReadOnly(){
 initTheme();
 initAuthListener();
 checkStravaCallback();
+autoSyncStravaIfNeeded();
 checkDevModeFromUrl();
 checkObjetivoRecordatorio();
 go('dash');
