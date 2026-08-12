@@ -5172,7 +5172,7 @@ async function authSendCode(){
   if(error){ showToast('Error: '+error.message,'var(--acc3)'); return; }
   window._authPendingEmail=email;
   window._authUiStep='code';
-  renderPerfil(document.getElementById('main'));
+  refreshAuthUI();
   showToast('Código enviado a '+email,'var(--acc)');
 }
 
@@ -5191,8 +5191,14 @@ async function authVerifyCode(){
   window._authUiStep='done';
   const accessToken=data?.session?.access_token;
   if(accessToken) await authLinkDevice(accessToken);
-  renderPerfil(document.getElementById('main'));
   showToast('¡Sesión iniciada!','var(--acc)');
+  // Si el login vino de la verja de acceso obligatoria, ahora sí se arranca
+  // la app de verdad — hasta este momento no se había mostrado nada.
+  if(document.getElementById('authGateOverlay')){
+    bootAppAfterAuth();
+  } else {
+    refreshAuthUI();
+  }
 }
 
 // Vincula el deviceId anónimo que este navegador ya usaba a la cuenta que
@@ -5219,14 +5225,74 @@ async function authLogout(){
   window._authSession=null;
   window._authUiStep='email';
   window._authPendingEmail='';
-  renderPerfil(document.getElementById('main'));
   showToast('Sesión cerrada','var(--text2)');
+  // El registro es obligatorio: cerrar sesión vuelve a bloquear la app,
+  // no la deja abierta sin cuenta.
+  showAuthGate();
 }
 
 function authCancelCode(){
   window._authUiStep='email';
   window._authPendingEmail='';
-  renderPerfil(document.getElementById('main'));
+  refreshAuthUI();
+}
+// Refresca la UI de login donde corresponda: la verja de acceso si está
+// activa, o el panel de Mi Perfil si el login se hizo desde ahí.
+function refreshAuthUI(){
+  if(document.getElementById('authGateOverlay')){
+    renderAuthGateBody();
+  } else if(typeof view!=='undefined' && view==='perfil'){
+    renderPerfil(document.getElementById('main'));
+  }
+}
+
+/* ============================================================
+   VERJA DE ACCESO OBLIGATORIA
+   Desde ahora hace falta cuenta para usar la app — nadie ve nada de la
+   app sin haber iniciado sesión antes, ni siquiera quien ya la usaba sin
+   cuenta. NO se tocan sus datos locales: en cuanto inicia sesión, ve
+   exactamente lo que ya tenía, con su deviceId vinculado a la cuenta.
+   El modo desarrollador (?dev=...) se salta esto, para no entorpecer
+   las pruebas de Héctor.
+============================================================ */
+function showAuthGate(){
+  document.getElementById('authGateOverlay')?.remove();
+  const overlay=document.createElement('div');
+  overlay.id='authGateOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:var(--bg1);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto';
+  overlay.innerHTML=`
+  <div style="max-width:400px;width:100%;text-align:center;margin:auto">
+    <div style="font-family:'Bebas Neue';font-size:36px;letter-spacing:2px;color:var(--text);margin-bottom:.4rem">
+      L<span style="color:var(--acc)">O</span>C<span style="color:var(--acc)">O</span>RUNNER
+    </div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:1.5rem;line-height:1.5">Necesitas una cuenta para entrar.<br>Tus entrenos y datos siguen a salvo en este dispositivo — esto solo protege tu acceso.</div>
+    <div id="authGateBody" style="text-align:left"></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  renderAuthGateBody();
+}
+function renderAuthGateBody(){
+  const el=document.getElementById('authGateBody');
+  if(!el) return;
+  if(window._authUiStep==='code'){
+    el.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.4rem">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:.85rem;text-align:center">Código enviado a <strong style="color:var(--text)">${esc(window._authPendingEmail)}</strong></div>
+      <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="123456" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:20px;letter-spacing:6px;text-align:center;outline:none;margin-bottom:.85rem;box-sizing:border-box">
+      <button id="authVerifyBtn" class="btn btn-acc" style="width:100%;padding:12px" onclick="authVerifyCode()">Verificar código</button>
+      <button onclick="authCancelCode()" style="width:100%;background:transparent;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline;font-family:'Inter';margin-top:.7rem">Usar otro email</button>
+    </div>`;
+  } else {
+    el.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.4rem">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:.7rem">Escribe tu email — te mandamos un código de 6 dígitos, sin contraseña que recordar.</div>
+      <input id="authEmailInput" type="email" placeholder="tu@email.com" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-size:14px;outline:none;margin-bottom:.85rem;box-sizing:border-box">
+      <button id="authSendBtn" class="btn btn-acc" style="width:100%;padding:12px" onclick="authSendCode()">Enviar código</button>
+    </div>`;
+  }
+}
+function hideAuthGate(){
+  document.getElementById('authGateOverlay')?.remove();
 }
 
 function renderAccountPanel(){
@@ -5254,7 +5320,7 @@ function renderAccountPanel(){
   return `
   <div class="panel">
     <div class="panel-title">👤 Mi cuenta</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:.85rem">Opcional por ahora. Crear una cuenta te permitirá, más adelante, mantener tu suscripción y tu progreso ligados a ti, no solo a este dispositivo.</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.85rem">Tu cuenta mantiene tu suscripción y tu progreso ligados a ti, no solo a este dispositivo.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input id="authEmailInput" type="email" placeholder="tu@email.com" style="flex:1;min-width:180px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">
       <button id="authSendBtn" class="btn btn-acc" onclick="authSendCode()">Enviar código</button>
@@ -9676,20 +9742,50 @@ function showLegalDisclaimerReadOnly(){
 
 initTheme();
 initAuthListener();
-checkStravaCallback();
-autoSyncStravaIfNeeded();
 checkDevModeFromUrl();
-checkObjetivoRecordatorio();
-checkCarrerasPendientes();
-go('dash');
-updateTopbar();
-updateStravaStatus();
-if(!S.athlete.nombre || !S.athlete.altura){
-  setTimeout(()=>startOnboarding(), 400);
-} else if(!S.legal || !S.legal.aceptado || S.legal.version!==LEGAL_DISCLAIMER_VERSION){
-  // Usuario ya onboardeado antes de que existiera el aviso — se lo pedimos aparte
-  setTimeout(()=>showLegalDisclaimerRetro(), 400);
+
+// Arranque real de la app — solo se llama una vez confirmada la sesión
+// (o si estamos en modo desarrollador). Todo lo que antes se ejecutaba
+// directo al cargar la página, ahora espera aquí.
+function bootAppAfterAuth(){
+  hideAuthGate();
+  checkStravaCallback();
+  autoSyncStravaIfNeeded();
+  checkObjetivoRecordatorio();
+  checkCarrerasPendientes();
+  go('dash');
+  updateTopbar();
+  updateStravaStatus();
+  if(!S.athlete.nombre || !S.athlete.altura){
+    setTimeout(()=>startOnboarding(), 400);
+  } else if(!S.legal || !S.legal.aceptado || S.legal.version!==LEGAL_DISCLAIMER_VERSION){
+    // Usuario ya onboardeado antes de que existiera el aviso — se lo pedimos aparte
+    setTimeout(()=>showLegalDisclaimerRetro(), 400);
+  }
 }
+
+// Comprueba si hay sesión iniciada antes de dejar pasar a nadie. El modo
+// desarrollador (?dev=código) se salta esto — nunca bloquea las pruebas.
+async function checkAuthGateAndBoot(){
+  if(isDevMode()){ bootAppAfterAuth(); return; }
+  const client=getSbClient();
+  if(!client){
+    // El SDK de Supabase no cargó (¿sin conexión?). No hay forma segura de
+    // comprobar la sesión, así que mostramos la verja igualmente — sin red
+    // tampoco se podría pedir un código nuevo, así que no cambia nada.
+    showAuthGate();
+    return;
+  }
+  const { data }=await client.auth.getSession();
+  if(data?.session){
+    window._authSession=data.session;
+    bootAppAfterAuth();
+  } else {
+    showAuthGate();
+  }
+}
+checkAuthGateAndBoot();
+
 // Wire up import input
 document.getElementById('importInput').onchange = function(e){
   const file = e.target.files[0]; if(!file) return;
