@@ -2418,11 +2418,18 @@ function proyectarCarrera(distKm, desnivel){
   if(!distKm||!E.length)return null;
 
   const hoyD=hoy();
-  // Referencias: entrenos de los últimos 90 días con al menos 4km, excluyendo deportes
-  // cuyo ritmo no es comparable al de una carrera a pie (bici, natación, pádel, etc.)
+  // Referencias: SOLO esfuerzos que de verdad representan capacidad de
+  // carrera — carreras y sesiones de calidad (series/tempo/fartlek/umbral).
+  // NUNCA un rodaje, por rápido o bueno que salga el número al extrapolarlo:
+  // un rodaje suave es un ritmo elegido a propósito lento, no una medida de
+  // lo rápido que puedes ir. Antes se aceptaba cualquier entreno de 4km+, y
+  // un rodaje tranquilo podía colarse como "mejor referencia" y empeorar la
+  // proyección sin ningún sentido (bug real reportado por Héctor).
   const refs=E.filter(e=>{
     const d=parseISO(e.fecha);
-    return esDeporteConRitmo(e.deporte) && e.dist>=4 && e.secs>0 && (hoyD-d)/86400000<=90;
+    if(!(esDeporteConRitmo(e.deporte) && e.dist>=4 && e.secs>0 && (hoyD-d)/86400000<=90)) return false;
+    const cat=clasificarTipoEntreno(e.tipo).label;
+    return cat==='Carrera' || cat==='Calidad';
   });
   if(!refs.length)return null;
 
@@ -4710,7 +4717,12 @@ async function stravaSync(silent){
       if(nuevo.deporte==='Running'||nuevo.deporte==='Trail'){
         const rawLaps=await fetchStravaLaps(act.id, token);
         const estructura=detectarEstructuraLaps(normalizarLapsStrava(rawLaps));
-        if(estructura){ nuevo.laps=estructura.laps; nuevo.esEstructurado=estructura.esEstructurado; }
+        if(estructura){
+          nuevo.laps=estructura.laps; nuevo.esEstructurado=estructura.esEstructurado;
+          // Reclasifica: en normalizarActividadStrava se etiquetó por distancia
+          // sin saber todavía si había series — ahora sí lo sabemos.
+          if(estructura.esEstructurado) nuevo.tipo='Series';
+        }
       }
       const candidatos=buscarPosiblesDuplicados(nuevo);
       if(candidatos.length){ pendientesDup.push(nuevo); }
@@ -8649,7 +8661,12 @@ function fitSportToDeporte(sport){
 }
 
 // Clasifica el tipo de entrenamiento a partir de distancia/duración (heurística, editable después)
-function classifyFitTipo(dist,secs){
+// Ahora usa la detección real de estructura (esEstructurado) en vez de
+// adivinar solo por distancia — antes una sesión de series importada de
+// .FIT/Strava siempre se etiquetaba "Rodaje", nunca "Series", y por tanto
+// nunca podía usarse como referencia fiable para proyectar tiempo de carrera.
+function classifyFitTipo(dist,secs,esEstructurado){
+  if(esEstructurado) return 'Series';
   if(dist>15)return'Tirada larga';
   if(dist<6)return'Activación';
   return'Rodaje';
@@ -8718,7 +8735,12 @@ async function handleFitFiles(fileList){
         if(!existing.ts&&ts){existing.ts=ts;enriched=true;}
         if(!existing.zan&&zan){existing.zan=zan;enriched=true;}
         if((!existing.dn||existing.dn===0)&&dn){existing.dn=dn;enriched=true;}
-        if(!existing.laps&&estructura){existing.laps=estructura.laps;existing.esEstructurado=estructura.esEstructurado;enriched=true;}
+        if(!existing.laps&&estructura){
+          existing.laps=estructura.laps;existing.esEstructurado=estructura.esEstructurado;
+          // Si antes se clasificó como Rodaje/Tirada larga sin saber que era series, se corrige
+          if(estructura.esEstructurado && !/series|tempo|fartlek|intervalo|umbral|carrera/i.test(existing.tipo||'')) existing.tipo='Series';
+          enriched=true;
+        }
         if(enriched)updated++; else skipped++;
         continue;
       }
@@ -8726,7 +8748,7 @@ async function handleFitFiles(fileList){
       const newEnt={
         id:Date.now()+added,
         fecha,
-        tipo:classifyFitTipo(dist,secs),
+        tipo:classifyFitTipo(dist,secs,estructura?estructura.esEstructurado:false),
         dist,
         secs,
         ritmo:parseFloat(ritmo.toFixed(3)),
