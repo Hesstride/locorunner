@@ -174,7 +174,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .cbox-title{font-size:9px;letter-spacing:2px;color:var(--text3);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.7rem}
 
 /* ===== TRAINING LIST ===== */
-.t-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:9px 12px;display:grid;grid-template-columns:80px 1fr 44px;align-items:center;gap:.75rem;cursor:pointer;transition:border-color .15s}
+.t-item{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:9px 12px;display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:.75rem;cursor:pointer;transition:border-color .15s}
 .t-item:hover{border-color:var(--acc)60}
 .t-date{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}
 .t-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
@@ -299,7 +299,8 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
   .cal-head-grid div{font-size:10.5px;padding:3px 0}
 
   .mc-val{font-size:22px}
-  .t-item{grid-template-columns:64px 1fr 36px;gap:.5rem;padding:8px 10px}
+  .t-item{grid-template-columns:64px 1fr auto;gap:.5rem;padding:8px 10px}
+  .t-item select{max-width:92px !important;font-size:9px !important}
 
   .eq-reloj-row{flex-direction:column;text-align:center}
   .eq-reloj-actions{margin-left:0 !important;width:100%;justify-content:center}
@@ -3293,9 +3294,9 @@ function renderCalendario(el){
               </div>
               <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
                 <div style="font-family:'Bebas Neue';font-size:20px;color:${urgColor}">${diff===0?'HOY':diff+'d'}</div>
-                <div style="display:flex;gap:4px;justify-content:flex-end;margin-top:3px">
-                  <button onclick="showAddEventModal('',${ev.id})" title="Editar evento" style="font-size:11px;background:transparent;border:none;color:var(--text3);cursor:pointer;padding:2px">✏️</button>
-                  <button onclick="deleteEvento(${ev.id})" title="Eliminar evento" style="font-size:11px;background:transparent;border:none;color:var(--text3);cursor:pointer;padding:2px">🗑</button>
+                <div style="display:flex;gap:2px;justify-content:flex-end;margin-top:3px">
+                  <button onclick="showAddEventModal('',${ev.id})" title="Editar evento" style="font-size:15px;background:transparent;border:none;color:var(--text3);cursor:pointer;padding:9px;border-radius:8px;line-height:1;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">✏️</button>
+                  <button onclick="deleteEvento(${ev.id})" title="Eliminar evento" style="font-size:15px;background:transparent;border:none;color:var(--text3);cursor:pointer;padding:9px;border-radius:8px;line-height:1;transition:background .15s" onmouseover="this.style.background='var(--acc3)15';this.style.color='var(--acc3)'" onmouseout="this.style.background='transparent';this.style.color='var(--text3)'">🗑</button>
                 </div>
               </div>
             </div>
@@ -4198,7 +4199,7 @@ function renderList(el){
     ${E.map(t=>{
       const s=score(t), sc=scoreClass(s);
       const shoe=shoes.find(z=>t.zapatilla!=null&&String(z.id)===String(t.zapatilla));
-      return`<div class="t-item" style="grid-template-columns:80px 1fr auto auto auto">
+      return`<div class="t-item">
         <div class="t-date" onclick="openTrain(${t.id})" style="cursor:pointer">${fmtD(t.fecha)}<br><span style="font-size:9px;color:${clasificarTipoEntreno(t.tipo).color}">${t.tipo}</span></div>
         <div onclick="openTrain(${t.id})" style="cursor:pointer">
           <div style="font-size:13px;font-weight:700">${t.dist}km · ${fmt(t.ritmo)}/km · ${fmtT(t.secs)}</div>
@@ -4211,15 +4212,17 @@ function renderList(el){
           </div>
           <div style="font-size:10px;color:var(--text3);margin-top:2px">${esc(t.notas||'')}</div>
         </div>
-        <div>
-          <select onchange="assignShoeInline(${t.id},this.value)" onclick="event.stopPropagation()" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text2);font-size:10px;outline:none;max-width:120px">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <select onchange="assignShoeInline(${t.id},this.value)" onclick="event.stopPropagation()" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 6px;color:var(--text2);font-size:10px;outline:none;max-width:120px">
             <option value="">👟 zapatilla</option>
             ${shoes.map(z=>`<option value="${z.id}" ${t.zapatilla===z.id?'selected':''}>${esc(z.nombre.split(' ').slice(0,2).join(' '))}</option>`).join('')}
             <option value="none" ${!t.zapatilla?'selected':''}>Sin asignar</option>
           </select>
+          <div style="display:flex;align-items:center;gap:2px">
+            <div class="score ${sc}" onclick="showScoreInfo()" style="cursor:help" title="Nota de calidad técnica de este entreno — pulsa para saber cómo se calcula">${s}</div>
+            <button onclick="event.stopPropagation();deleteEntrenamiento(${t.id})" title="Borrar este entreno" style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:9px;border-radius:8px;line-height:1;transition:all .15s" onmouseover="this.style.color='var(--acc3)';this.style.background='var(--acc3)15'" onmouseout="this.style.color='var(--text3)';this.style.background='transparent'">🗑</button>
+          </div>
         </div>
-        <div class="score ${sc}" onclick="showScoreInfo()" style="cursor:help" title="Nota de calidad técnica de este entreno — pulsa para saber cómo se calcula">${s}</div>
-        <button onclick="event.stopPropagation();deleteEntrenamiento(${t.id})" title="Borrar este entreno" style="background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s" onmouseover="this.style.color='var(--acc3)';this.style.background='var(--acc3)15'" onmouseout="this.style.color='var(--text3)';this.style.background='transparent'">🗑</button>
       </div>`;
     }).join('')}
   </div>`;
