@@ -333,12 +333,12 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
     <button id="themeToggle" onclick="toggleTheme()" title="Cambiar tema" style="background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;color:var(--text2);cursor:pointer;font-size:13px;transition:all .2s" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">🌙</button>
     <button id="btnSetup" onclick="showSetupModal()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:5px 13px;cursor:pointer;font-size:12px;font-family:'Bebas Neue';letter-spacing:1px;display:none;align-items:center;gap:5px">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      <span class="tb-btn-label">INTRODUCIR MIS DATOS</span>
+      <span class="tb-btn-label" data-i18n="topbar.introducir_datos">INTRODUCIR MIS DATOS</span>
     </button>
     <div id="importDropdownWrap" style="position:relative">
       <button id="btnFitImport" onclick="toggleImportDropdown()" title="Traer tus entrenos: conectar Strava o importar un archivo .FIT" style="background:var(--c-zan);border:none;border-radius:6px;padding:5px 11px;cursor:pointer;font-size:11px;font-family:'Space Grotesk';display:flex;align-items:center;gap:6px;color:#000;font-weight:600;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span class="tb-btn-label">Traer mis entrenos</span>
+        <span class="tb-btn-label" data-i18n="topbar.traer_entrenos">Traer mis entrenos</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
     </div>
@@ -350,55 +350,55 @@ img.thumb{max-width:180px;border-radius:6px;border:1px solid var(--border);margi
 
 <!-- SIDEBAR -->
 <div class="sidebar">
-  <div class="nav-sec">Principal</div>
+  <div class="nav-sec" data-i18n="nav.principal">Principal</div>
   <button class="nav-btn on" id="nb-dash" onclick="go('dash')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span data-i18n="nav.dashboard">Dashboard</span>
   </button>
   <button class="nav-btn" id="nb-chat" onclick="go('chat')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span id="navCoachLabel">Hablar con Alex</span>
   </button>
 
-  <div class="nav-sec">Entrenamientos</div>
+  <div class="nav-sec" data-i18n="nav.entrenamientos">Entrenamientos</div>
   <button class="nav-btn" id="nb-planes" onclick="go('planes')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Entrenos programados
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span data-i18n="nav.entrenos_programados">Entrenos programados</span>
     <span id="planesBadge" style="margin-left:auto;background:var(--acc3);color:#fff;border-radius:10px;padding:1px 6px;font-size:9px;font-family:'JetBrains Mono'"></span>
   </button>
   <button class="nav-btn" id="nb-list" onclick="go('list')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Entrenos realizados
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span data-i18n="nav.entrenos_realizados">Entrenos realizados</span>
   </button>
 
-  <div class="nav-sec">Datos</div>
+  <div class="nav-sec" data-i18n="nav.datos">Datos</div>
   <button class="nav-btn" id="nb-fc" onclick="go('fc')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>FC &amp; Zonas
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span data-i18n="nav.fc_zonas">FC &amp; Zonas</span>
   </button>
   <button class="nav-btn" id="nb-bio" onclick="go('bio')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20"/></svg>Biomecánica
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20"/></svg><span data-i18n="nav.biomecanica">Biomecánica</span>
   </button>
   <button class="nav-btn" id="nb-science" onclick="go('science')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5l3 9H5l7 9 7-9h-3l3-9h-4"/></svg>Métricas avanzadas
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5l3 9H5l7 9 7-9h-3l3-9h-4"/></svg><span data-i18n="nav.metricas">Métricas avanzadas</span>
   </button>
 
-  <div class="nav-sec">Más</div>
+  <div class="nav-sec" data-i18n="nav.mas">Más</div>
   <button class="nav-btn" id="nb-calendario" onclick="go('calendario')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendario
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span data-i18n="nav.calendario">Calendario</span>
     <span id="eventsBadge" style="margin-left:auto;background:var(--acc2);color:#000;border-radius:10px;padding:1px 6px;font-size:9px;font-family:'JetBrains Mono'"></span>
   </button>
   <button class="nav-btn" id="nb-cmp" onclick="go('cmp')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Comparar
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span data-i18n="nav.comparar">Comparar</span>
   </button>
   <button class="nav-btn" id="nb-nutr" onclick="go('nutr')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>Nutrición
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg><span data-i18n="nav.nutricion">Nutrición</span>
   </button>
   <button class="nav-btn" id="nb-equipacion" onclick="go('equipacion')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>Equipación
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg><span data-i18n="nav.equipacion">Equipación</span>
   </button>
   <button class="nav-btn" id="nb-tienda" onclick="go('tienda')" style="color:var(--acc);border:1.5px solid var(--acc);background:transparent">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>Tienda
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg><span data-i18n="nav.tienda">Tienda</span>
   </button>
 
-  <div class="nav-sec" style="margin-top:auto">Config</div>
+  <div class="nav-sec" style="margin-top:auto" data-i18n="nav.config">Config</div>
   <button class="nav-btn" id="nb-perfil" onclick="go('perfil')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Mi perfil
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span data-i18n="nav.mi_perfil">Mi perfil</span>
   </button>
 </div>
 
@@ -454,6 +454,106 @@ Al marcar la casilla y continuar, confirmas que has leído y entendido este avis
    - Un "borrar todos los datos" deba tocarlos explícitamente (ver resetAllData())
 ============================================================ */
 const CYCLE_KEY = 'stride_v2_cycle';
+
+/* ============================================================
+   IDIOMAS — sistema de traducción por diccionario
+   Empieza cubriendo el menú, el topbar y el inicio del onboarding (lo que
+   ve todo el mundo desde el primer segundo). El resto de textos de la app
+   se va traduciendo poco a poco, según se vaya tocando cada pantalla —
+   no bloquea nada más mientras tanto: si una clave no existe en el idioma
+   elegido, se cae al español, nunca se rompe ni queda en blanco.
+============================================================ */
+const IDIOMAS_DISPONIBLES=[
+  {code:'es', label:'Español'},
+  {code:'en', label:'English'},
+  {code:'pt', label:'Português (BR)'},
+  {code:'fr', label:'Français'},
+  {code:'it', label:'Italiano'},
+];
+const TRANSLATIONS={
+  es:{
+    'nav.principal':'Principal','nav.dashboard':'Dashboard','nav.hablar_con':'Hablar con',
+    'nav.entrenamientos':'Entrenamientos','nav.entrenos_programados':'Entrenos programados','nav.entrenos_realizados':'Entrenos realizados',
+    'nav.datos':'Datos','nav.fc_zonas':'FC & Zonas','nav.biomecanica':'Biomecánica','nav.metricas':'Métricas avanzadas',
+    'nav.mas':'Más','nav.calendario':'Calendario','nav.comparar':'Comparar','nav.nutricion':'Nutrición','nav.equipacion':'Equipación','nav.tienda':'Tienda',
+    'nav.config':'Config','nav.mi_perfil':'Mi perfil',
+    'topbar.introducir_datos':'INTRODUCIR MIS DATOS','topbar.traer_entrenos':'Traer mis entrenos',
+    'onb.idioma_label':'Idioma de la app',
+  },
+  en:{
+    'nav.principal':'Main','nav.dashboard':'Dashboard','nav.hablar_con':'Talk to',
+    'nav.entrenamientos':'Training','nav.entrenos_programados':'Planned sessions','nav.entrenos_realizados':'Completed sessions',
+    'nav.datos':'Data','nav.fc_zonas':'HR & Zones','nav.biomecanica':'Biomechanics','nav.metricas':'Advanced metrics',
+    'nav.mas':'More','nav.calendario':'Calendar','nav.comparar':'Compare','nav.nutricion':'Nutrition','nav.equipacion':'Gear','nav.tienda':'Shop',
+    'nav.config':'Settings','nav.mi_perfil':'My profile',
+    'topbar.introducir_datos':'ENTER MY DATA','topbar.traer_entrenos':'Import my workouts',
+    'onb.idioma_label':'App language',
+  },
+  pt:{
+    'nav.principal':'Principal','nav.dashboard':'Painel','nav.hablar_con':'Falar com',
+    'nav.entrenamientos':'Treinos','nav.entrenos_programados':'Treinos planejados','nav.entrenos_realizados':'Treinos realizados',
+    'nav.datos':'Dados','nav.fc_zonas':'FC & Zonas','nav.biomecanica':'Biomecânica','nav.metricas':'Métricas avançadas',
+    'nav.mas':'Mais','nav.calendario':'Calendário','nav.comparar':'Comparar','nav.nutricion':'Nutrição','nav.equipacion':'Equipamento','nav.tienda':'Loja',
+    'nav.config':'Config','nav.mi_perfil':'Meu perfil',
+    'topbar.introducir_datos':'INSERIR MEUS DADOS','topbar.traer_entrenos':'Importar meus treinos',
+    'onb.idioma_label':'Idioma do app',
+  },
+  fr:{
+    'nav.principal':'Principal','nav.dashboard':'Tableau de bord','nav.hablar_con':'Parler à',
+    'nav.entrenamientos':'Entraînements','nav.entrenos_programados':'Séances programmées','nav.entrenos_realizados':'Séances réalisées',
+    'nav.datos':'Données','nav.fc_zonas':'FC & Zones','nav.biomecanica':'Biomécanique','nav.metricas':'Métriques avancées',
+    'nav.mas':'Plus','nav.calendario':'Calendrier','nav.comparar':'Comparer','nav.nutricion':'Nutrition','nav.equipacion':'Équipement','nav.tienda':'Boutique',
+    'nav.config':'Config','nav.mi_perfil':'Mon profil',
+    'topbar.introducir_datos':'SAISIR MES DONNÉES','topbar.traer_entrenos':'Importer mes séances',
+    'onb.idioma_label':'Langue de l\'application',
+  },
+  it:{
+    'nav.principal':'Principale','nav.dashboard':'Dashboard','nav.hablar_con':'Parla con',
+    'nav.entrenamientos':'Allenamenti','nav.entrenos_programados':'Allenamenti programmati','nav.entrenos_realizados':'Allenamenti completati',
+    'nav.datos':'Dati','nav.fc_zonas':'FC & Zone','nav.biomecanica':'Biomeccanica','nav.metricas':'Metriche avanzate',
+    'nav.mas':'Altro','nav.calendario':'Calendario','nav.comparar':'Confronta','nav.nutricion':'Nutrizione','nav.equipacion':'Attrezzatura','nav.tienda':'Negozio',
+    'nav.config':'Config','nav.mi_perfil':'Il mio profilo',
+    'topbar.introducir_datos':'INSERISCI I MIEI DATI','topbar.traer_entrenos':'Importa i miei allenamenti',
+    'onb.idioma_label':'Lingua dell\'app',
+  },
+};
+function getIdioma(){ return S?.athlete?.idioma || 'es'; }
+function t(key, vars){
+  const lang=getIdioma();
+  let str=(TRANSLATIONS[lang]&&TRANSLATIONS[lang][key])||TRANSLATIONS.es[key]||key;
+  if(vars) Object.keys(vars).forEach(k=>{ str=str.replace(new RegExp('\\{'+k+'\\}','g'), vars[k]); });
+  return str;
+}
+// Recorre el DOM aplicando las traducciones a cualquier elemento marcado.
+// Se llama al arrancar y cada vez que se cambia el idioma.
+function applyTranslations(){
+  document.documentElement.setAttribute('lang', getIdioma());
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder'))); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.setAttribute('title', t(el.getAttribute('data-i18n-title'))); });
+  const navCoach=document.getElementById('navCoachLabel');
+  if(navCoach) navCoach.textContent=t('nav.hablar_con')+' '+coachNombre();
+}
+// Cambia el idioma, guarda, y re-pinta todo lo visible sin recargar la página
+function setIdioma(code){
+  if(!S.athlete) return;
+  S.athlete.idioma=code;
+  save();
+  applyTranslations();
+  // El onboarding vive en su propio overlay, aparte del sistema go() — hay
+  // que refrescarlo por separado si está abierto ahora mismo.
+  if(document.getElementById('onbFlow')) onbRender();
+  else if(typeof view!=='undefined' && view) go(view);
+  showToast(t('onb.idioma_label')+': '+(IDIOMAS_DISPONIBLES.find(i=>i.code===code)?.label||code),'var(--acc)');
+}
+// Selector reutilizable (onboarding y Mi Perfil)
+function renderIdiomaSelector(compact){
+  const actual=getIdioma();
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap">
+    ${IDIOMAS_DISPONIBLES.map(i=>`<button onclick="setIdioma('${i.code}')" style="background:${actual===i.code?'var(--acc)':'var(--bg3)'};color:${actual===i.code?'#000':'var(--text2)'};border:1px solid ${actual===i.code?'var(--acc)':'var(--border)'};border-radius:6px;padding:${compact?'6px 10px':'8px 14px'};cursor:pointer;font-size:12px;font-family:'Space Grotesk'">${esc(i.label)}</button>`).join('')}
+  </div>`;
+}
+
 function loadCycleData(){
   try{
     const raw=localStorage.getItem(CYCLE_KEY);
@@ -631,7 +731,7 @@ function coachTitulo(){var g=(S.coach&&S.coach.genero)||'masculino';return (g===
 function emptyState(){
   return {
     isNewUser: true,
-    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach',objetivoUltimaConfirmacion:''},
+    athlete:{nombre:'',sexo:'hombre',altura:0,peso:0,edad:'',objetivo:'',objetivo_fecha:'',objetivo_ritmo:'',lesiones:'',fcmax:0,fcreposo:0,nivel:'',volumenSemanal:0,diasDisponibles:[],entrenosFijos:[],objetivo_tipo:'',deportes:[],gymDays:[],gymMode:'coach',objetivoUltimaConfirmacion:'',idioma:'es'},
     coach:{genero:'masculino',estilo:'exigente'},
     equipacion:{reloj:{marca:'',modelo:''},zapatillas:[]},
     entrenamientos:[],
@@ -677,6 +777,7 @@ function load(){
         if(!Array.isArray(d.athlete.diasDisponibles))d.athlete.diasDisponibles=[];
         if(!Array.isArray(d.athlete.entrenosFijos))d.athlete.entrenosFijos=[];
         if(!d.athlete.objetivoUltimaConfirmacion)d.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
+        if(!d.athlete.idioma)d.athlete.idioma='es';
         if(d.athlete.objetivo_tipo===undefined)d.athlete.objetivo_tipo='';
       }
       if(!d.equipacion)d.equipacion={reloj:{marca:'',modelo:''},zapatillas:[],defaultShoe:null};
@@ -936,7 +1037,7 @@ function go(v){
 function updateTopbar(){
   const a=S.athlete;
   const navCoach=document.getElementById('navCoachLabel');
-  if(navCoach) navCoach.textContent='Hablar con '+coachNombre();
+  if(navCoach) navCoach.textContent=t('nav.hablar_con')+' '+coachNombre();
   renderImportDropdownStrava();
   const chip=document.getElementById('chipProfile');
   const relojChip=document.getElementById('chipReloj');
@@ -1424,6 +1525,7 @@ function onbStepBody(key){
       return `
       <div style="text-align:center;padding:1rem 0 .5rem">
         <div style="margin-bottom:.9rem"><svg viewBox="0 0 104 92" aria-hidden="true" style="height:58px;width:auto;display:block;margin:0 auto"><circle cx="34" cy="52" r="24" fill="none" stroke="var(--acc)" stroke-width="9"/><circle cx="76" cy="60" r="16" fill="none" stroke="var(--acc)" stroke-width="9"/><circle cx="34" cy="42" r="9" fill="var(--acc)"/><circle cx="76" cy="52" r="6" fill="var(--acc)"/></svg></div>
+        <div style="display:flex;justify-content:center;margin-bottom:1rem">${renderIdiomaSelector(true)}</div>
         <div class="onb-title" style="font-size:30px;color:var(--acc)">TE DOY LA BIENVENIDA A LOCORUNNER</div>
         <div class="onb-sub" style="margin-top:.8rem;max-width:400px;margin-left:auto;margin-right:auto">
           Vamos a configurar tu perfil en un minuto. Cuanto mejor te conozca tu entrenador IA, más precisos y personalizados serán sus entrenamientos, siempre basados en evidencia científica.
@@ -7536,7 +7638,11 @@ function tryExtractAndSaveMetrics(replyText, userPrompt){
 
 function buildSys(){
   const a=S.athlete, E=S.entrenamientos;
-  if(!E||E.length===0) return 'Eres Locorunner, entrenador IA de running. El atleta aún no tiene entrenamientos registrados. Ayúdale a configurar su perfil e importar sus entrenamientos (.FIT).';
+  if(!E||E.length===0){
+    const idiomaNombre0={es:'español',en:'English',pt:'português do Brasil',fr:'français',it:'italiano'}[getIdioma()]||'español';
+    const idiomaInstr0=getIdioma()==='es'?'':` Responde SIEMPRE en ${idiomaNombre0}, nunca en español, sin importar en qué idioma te escriba.`;
+    return `Eres Locorunner, entrenador IA de running. El atleta aún no tiene entrenamientos registrados. Ayúdale a configurar su perfil e importar sus entrenamientos (.FIT).${idiomaInstr0}`;
+  }
 
   const last=E[E.length-1], first=E[0];
   const z=hrZones(a.fcmax||175);
@@ -7646,8 +7752,16 @@ function buildSys(){
   };
   const tonoStr=estilosPrompt[coachCfg.estilo]||estilosPrompt['exigente'];
 
-  return`Eres ${coachNombre}, ${coachPronouns.coach} personal de running de alto rendimiento. Tu estilo es el de un${coachCfg.genero==='femenino'?'a':''} coach exigente pero cercano${coachCfg.genero==='femenino'?'a':''}: celebras los logros con energía real, eres directo${coachCfg.genero==='femenino'?'a':''} y sin rodeos cuando algo se hace mal, y siempre basas todo en los datos concretos del atleta. Nunca das respuestas genéricas. Cada respuesta usa los datos reales del historial.
+  // Instrucción de idioma — el atleta puede haber elegido inglés o
+  // portugués para el resto de la app; el entrenador responde en ese
+  // idioma SIEMPRE, sin importar en qué idioma le escriba el atleta.
+  const idiomaNombre={es:'español',en:'English',pt:'português do Brasil',fr:'français',it:'italiano'}[getIdioma()]||'español';
+  const idiomaInstr=getIdioma()==='es'
+    ? ''
+    : `\n⛔ IDIOMA: responde SIEMPRE en ${idiomaNombre}, sin importar en qué idioma te escriba el atleta. Ni una palabra en español salvo términos propios del running que no tengan traducción natural.\n`;
 
+  return`Eres ${coachNombre}, ${coachPronouns.coach} personal de running de alto rendimiento. Tu estilo es el de un${coachCfg.genero==='femenino'?'a':''} coach exigente pero cercano${coachCfg.genero==='femenino'?'a':''}: celebras los logros con energía real, eres directo${coachCfg.genero==='femenino'?'a':''} y sin rodeos cuando algo se hace mal, y siempre basas todo en los datos concretos del atleta. Nunca das respuestas genéricas. Cada respuesta usa los datos reales del historial.
+${idiomaInstr}
 ══════════════════════════════════
 PERFIL DEL ATLETA
 ══════════════════════════════════
@@ -8931,6 +9045,12 @@ function renderPerfil(el){
   <!-- MI CUENTA (Fase 2, opcional por ahora) -->
   ${renderAccountPanel()}
 
+  <!-- IDIOMA -->
+  <div class="panel">
+    <div class="panel-title">🌐 ${t('onb.idioma_label')}</div>
+    ${renderIdiomaSelector(false)}
+  </div>
+
   <!-- LEGAL -->
   <div class="panel">
     <div class="panel-title">📄 Legal</div>
@@ -9920,6 +10040,7 @@ checkDevModeFromUrl();
 // directo al cargar la página, ahora espera aquí.
 function bootAppAfterAuth(){
   hideAuthGate();
+  applyTranslations();
   checkStravaCallback();
   autoSyncStravaIfNeeded();
   checkObjetivoRecordatorio();
