@@ -9440,8 +9440,8 @@ function showComentarioModal(ent, goListAfter){
       </button>
     </div>
     <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
-      <button onclick="saveComentario(${ent.id},${!!goListAfter})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR COMENTARIO</button>
-      <button onclick="closeComentario(${!!goListAfter})" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Space Grotesk'">${goListAfter?'Ahora no':'Cancelar'}</button>
+      <button id="comGuardarBtn" onclick="saveComentario(${ent.id},${!!goListAfter})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR COMENTARIO</button>
+      <button id="comCancelBtn" onclick="closeComentario(${!!goListAfter})" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Space Grotesk'">${goListAfter?'Ahora no':'Cancelar'}</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -9458,13 +9458,16 @@ function showComentarioModalThenAnalyze(ent){
   showComentarioModal(ent, false);
   const modal=document.getElementById('comentarioModal');
   if(!modal) return;
-  // Reemplazar el botón "Guardar comentario" para que además dispare el análisis
-  const guardar=modal.querySelector('button');
+  // Busca los botones por su id propio — antes se cogía "el primer botón del
+  // modal" a ciegas, y al añadir el botón del micro (que también es un
+  // <button>) se coló por delante y se acabó etiquetando el micro como
+  // "Guardar y analizar" en vez del botón de guardar de verdad.
+  const guardar=document.getElementById('comGuardarBtn');
   if(guardar){
     guardar.setAttribute('onclick',`saveComentarioAndAnalyze(${ent.id})`);
     guardar.textContent='GUARDAR Y ANALIZAR';
   }
-  const cancelar=modal.querySelectorAll('button')[1];
+  const cancelar=document.getElementById('comCancelBtn');
   if(cancelar){
     cancelar.textContent='Analizar sin comentar';
     cancelar.setAttribute('onclick',`document.getElementById('comentarioModal').remove();analizarEntreno(${ent.id})`);
