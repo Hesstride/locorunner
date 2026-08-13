@@ -7298,15 +7298,16 @@ function requireDataForAI(opts){
 // Funciona bien en Chrome/Android; en Safari/iOS el soporte es peor o
 // inexistente — se avisa con un toast en vez de fallar en silencio.
 let _dictadoRecognition=null, _dictadoActivo=false;
-function toggleDictado(){
+function toggleDictado(inputId='cinput', btnId='btnDictado'){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SpeechRecognition){
     showToast('Tu navegador no soporta dictado por voz — prueba desde Chrome/Android','var(--acc3)');
     return;
   }
-  const btn=document.getElementById('btnDictado');
+  const btn=document.getElementById(btnId);
   if(_dictadoActivo){ _dictadoRecognition?.stop(); return; }
-  const input=document.getElementById('cinput');
+  const input=document.getElementById(inputId);
+  if(!input) return;
   const textoBase=input.value?input.value.trim()+' ':'';
   _dictadoRecognition=new SpeechRecognition();
   _dictadoRecognition.lang='es-ES';
@@ -9432,7 +9433,12 @@ function showComentarioModal(ent, goListAfter){
     <div style="font-family:'Bebas Neue';font-size:20px;letter-spacing:2px;color:var(--acc4);margin-bottom:.25rem">💬 ¿Algo que contar de este entreno?</div>
     <div style="font-size:12px;color:var(--text2);margin-bottom:1rem">${fmtD(ent.fecha)} · ${ent.tipo} · ${ent.dist}km a ${fmt(ent.ritmo)}/km</div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;line-height:1.5">Cuenta lo que los datos no dicen: viento, calor, cuestas que caminaste, molestias, sensaciones… El entrenador lo tendrá en cuenta al analizar y su valoración será mucho más fiel a la realidad.</div>
-    <textarea id="comInput" rows="4" placeholder="Ej: Caminé en las cuestas del km 4 al 6, por eso baja la cadencia. Viento en contra la segunda mitad." style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:10px 12px;color:var(--text);font-size:13px;font-family:'Space Grotesk';box-sizing:border-box;resize:vertical">${actual}</textarea>
+    <div style="position:relative">
+      <textarea id="comInput" rows="4" placeholder="Ej: Caminé en las cuestas del km 4 al 6, por eso baja la cadencia. Viento en contra la segunda mitad." style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:10px 40px 10px 12px;color:var(--text);font-size:13px;font-family:'Space Grotesk';box-sizing:border-box;resize:vertical">${actual}</textarea>
+      <button id="btnDictadoComentario" onclick="toggleDictado('comInput','btnDictadoComentario')" title="Dictar por voz" style="position:absolute;top:8px;right:8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:6px;cursor:pointer;color:var(--text2);transition:all .15s">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+    </div>
     <div style="display:flex;gap:.75rem;margin-top:1.25rem;flex-wrap:wrap">
       <button onclick="saveComentario(${ent.id},${!!goListAfter})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:11px;cursor:pointer;font-family:'Bebas Neue';font-size:15px;letter-spacing:1px">GUARDAR COMENTARIO</button>
       <button onclick="closeComentario(${!!goListAfter})" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:11px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Space Grotesk'">${goListAfter?'Ahora no':'Cancelar'}</button>
@@ -9517,7 +9523,12 @@ function showComentarioBatchModal(entrenos){
       ${entrenos.map(e=>`
         <div style="display:flex;flex-direction:column;gap:.4rem;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r2);padding:.75rem">
           <div style="font-size:12px;color:var(--text);font-weight:600">${fmtD(e.fecha)} · ${e.tipo} · ${e.dist}km</div>
-          <textarea data-eid="${e.id}" rows="2" placeholder="Viento, calor, cuestas caminadas, sensaciones…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px;font-family:'Space Grotesk';box-sizing:border-box;resize:vertical">${notaCorredor(e)}</textarea>
+          <div style="position:relative">
+            <textarea id="comBatch_${e.id}" data-eid="${e.id}" rows="2" placeholder="Viento, calor, cuestas caminadas, sensaciones…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 34px 7px 9px;color:var(--text);font-size:12px;font-family:'Space Grotesk';box-sizing:border-box;resize:vertical">${notaCorredor(e)}</textarea>
+            <button id="btnDictado_${e.id}" onclick="toggleDictado('comBatch_${e.id}','btnDictado_${e.id}')" title="Dictar por voz" style="position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px;cursor:pointer;color:var(--text2);transition:all .15s">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+          </div>
         </div>`).join('')}
     </div>
     <div style="display:flex;gap:.75rem">
