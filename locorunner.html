@@ -2624,6 +2624,39 @@ const COACH_FRASES = {
     "Tu {planDesc} de hoy te espera. El plan ya lo pensamos; hoy solo se corre. 👟",
     "Sesión de hoy: {planDesc}. Cíñete al plan y el resto viene solo. 💪",
   ],
+  // Hoy tocaba descanso programado, todavía no has entrenado
+  descanso_hoy: [
+    "Hoy toca descanso en el plan. Aprovecha para recuperar bien, {nombre}. 😴",
+    "Día de descanso programado. El cuerpo también progresa así. 🔋",
+  ],
+  // Ya has registrado el entreno de HOY, y coincide con lo que pedía el plan
+  completado_hoy_match: [
+    "Hecho el {tipoHoy} de hoy, tal como tocaba. Bien ahí, {nombre}. ✅",
+    "{tipoHoy} de {distHoy}km completado, según lo previsto. Sigue así. 💪",
+    "Cumplido lo de hoy. Así se construye la temporada, {nombre}. 📈",
+  ],
+  // Entreno de HOY registrado, pero distinto a lo que pedía el plan
+  completado_hoy_distinto: [
+    "Hoy tocaba algo de más calidad y ha salido un {tipoHoy} — sin problema, el cuerpo manda. 👍",
+    "Entreno registrado hoy, aunque distinto a lo planeado. Se ajusta y ya está. 🔄",
+    "{tipoHoy} de {distHoy}km hoy — no era justo lo previsto, pero cuenta igual. 📝",
+  ],
+  // Entrenaste hoy pese a tener descanso programado
+  completado_hoy_descanso: [
+    "Hoy tocaba descanso, pero has sumado {distHoy}km igualmente. Escucha también al cuerpo. 😅",
+    "Descanso en el plan, entreno en la realidad. Vigila no acumular fatiga, {nombre}. ⚠️",
+  ],
+  // Entreno de HOY registrado, sin plan concreto con el que compararlo
+  completado_hoy_libre: [
+    "{tipoHoy} de {distHoy}km hoy, ya en el marcador. Bien, {nombre}. 👟",
+    "Entreno de hoy registrado: {distHoy}km. Suma y sigue. 📊",
+  ],
+  // Ayer entrenaste, hoy no hay nada hecho ni programado — no rompas la racha
+  cumplir_hoy: [
+    "Ayer sumaste, hoy no hay nada programado — pero eso no significa que no toque nada. ¿Salimos, {nombre}? 👟",
+    "Sin plan para hoy, pero ayer entrenaste. La constancia también se cuida los días libres. 🔥",
+    "Hoy no hay nada en el plan. Buen momento para un rodaje suave por tu cuenta. 🏃",
+  ],
   // Genérico motivador (fallback)
   generico: [
     "Cada entreno cuenta, {nombre}. Hoy es un buen día para sumar uno. 👟",
@@ -2656,6 +2689,12 @@ function dailyMsgContext(){
     .sort((a,b)=>a.diff-b.diff);
   const nextPlan=pendientes[0]||null;
   const planHoy=pendientes.find(p=>p.diff===0)||null;
+  // Plan de mañana (para poder adelantarlo cuando hoy ya está hecho)
+  const planManana=(S.planes||[]).find(p=>p.fecha&&diasEntre(hoyISO(),p.fecha)===1)||null;
+  // Entreno de HOY concretamente — distinto de "last", que puede ser de cualquier día
+  const entrenoHoy=E.find(e=>e.fecha===hoyISO())||null;
+  // Plan que tocaba hoy, completado o no, para poder comparar con lo hecho
+  const planHoyCualquiera=(S.planes||[]).filter(p=>p.fecha===hoyISO())[0]||null;
   // Descriptor corto del plan (tipo o título) para las plantillas
   const planDesc=(p)=>{
     if(!p) return '';
@@ -2667,18 +2706,43 @@ function dailyMsgContext(){
     return 'entreno planificado';
   };
 
-  return {last,nextEv,kmSem,diasSinCorrer,tendencia,nextPlan,planHoy,planDesc};
+  return {last,nextEv,kmSem,diasSinCorrer,tendencia,nextPlan,planHoy,planManana,entrenoHoy,planHoyCualquiera,planDesc};
+}
+
+// Compara lo realmente registrado HOY contra lo que pedía el plan de hoy —
+// sin IA, solo mirando el tipo (ya clasificado por detección de series).
+// 'cumplido' | 'distinto' | 'descanso_roto' | null (sin plan que comparar)
+function compararEntrenoConPlan(entreno, plan){
+  if(!plan) return null;
+  if(plan.esDescanso) return 'descanso_roto';
+  const desc=(plan.contenido||'').toLowerCase();
+  const pediaCalidad=/series|tempo|fartlek|intervalo|umbral/i.test(desc);
+  const hizoCalidad=entreno.tipo==='Series'||entreno.esEstructurado;
+  if(pediaCalidad && !hizoCalidad) return 'distinto';
+  return 'cumplido';
 }
 
 // Elige la categoría de frase según las variables del contexto
 function pickCoachCategory(ctx){
-  const {nextEv,kmSem,diasSinCorrer,tendencia,planHoy}=ctx;
+  const {nextEv,kmSem,diasSinCorrer,tendencia,planHoy,entrenoHoy,planHoyCualquiera,last}=ctx;
   if(nextEv){
     if(nextEv.diff===0) return 'carrera_hoy';
     if(nextEv.diff===1) return 'carrera_manana';
     if(nextEv.diff<=6)  return 'carrera_inminente';
   }
-  if(planHoy) return 'plan_hoy';
+  // Si ya hay un entreno registrado HOY, el mensaje se centra en eso — no en
+  // lo que "toca", sino en lo que ya se hizo. Esto es lo que hace que el
+  // mensaje cambie al instante en cuanto subes el entreno del día.
+  if(entrenoHoy){
+    const cmp=compararEntrenoConPlan(entrenoHoy, planHoyCualquiera);
+    if(cmp==='cumplido') return 'completado_hoy_match';
+    if(cmp==='distinto') return 'completado_hoy_distinto';
+    if(cmp==='descanso_roto') return 'completado_hoy_descanso';
+    return 'completado_hoy_libre';
+  }
+  if(planHoy) return planHoy.esDescanso?'descanso_hoy':'plan_hoy';
+  // Ayer entrenaste, hoy nada hecho ni programado — el "hoy hay que cumplir"
+  if(last && diasEntre(last.fecha,hoyISO())===1) return 'cumplir_hoy';
   if(diasSinCorrer>=4)  return 'inactivo';
   if(tendencia>0.02 && kmSem>=15) return 'buena_forma';
   if(kmSem>=25) return 'semana_fuerte';
@@ -2700,12 +2764,16 @@ function fillCoachTemplate(tpl, ctx){
     '{diaUlt}':ctx.last?diaSemana(ctx.last.fecha).toLowerCase():'',
     '{planDesc}':ctx.planHoy?ctx.planDesc(ctx.planHoy):(ctx.nextPlan?ctx.planDesc(ctx.nextPlan):'entreno'),
     '{planDia}':ctx.nextPlan?diaSemana(ctx.nextPlan.fecha).toLowerCase():'',
+    '{tipoHoy}':ctx.entrenoHoy?ctx.entrenoHoy.tipo.toLowerCase():'entreno',
+    '{distHoy}':ctx.entrenoHoy?ctx.entrenoHoy.dist:'',
   };
   return tpl.replace(/\{[a-zA-Z]+\}/g, m=>rep[m]!==undefined?rep[m]:m);
 }
 
-// Selección determinista por día: misma frase durante todo el día,
-// pero rota entre días para no repetir. Sin llamadas a la API.
+// Selección determinista por día: misma frase durante todo el día (mismo
+// estado), pero se recalcula al instante si el estado cambia — por ejemplo,
+// en cuanto se registra el entreno de hoy. Sin llamadas a la API: nunca
+// gasta consultas del usuario por algo que no ha pedido.
 function getDailyCoachMessage(){
   const ctx=dailyMsgContext();
   const cat=pickCoachCategory(ctx);
@@ -2713,97 +2781,28 @@ function getDailyCoachMessage(){
   // Índice estable por fecha: cambia cada día, no en cada apertura
   const seed=parseISO(hoyISO()).getTime()/86400000;
   const idx=Math.floor(seed)%pool.length;
-  return fillCoachTemplate(pool[idx], ctx);
+  let msg=fillCoachTemplate(pool[idx], ctx);
+  // Si hoy ya se entrenó, se adelanta lo de mañana — sin esto, el mensaje se
+  // quedaría "corto" en cuanto ya hiciste lo de hoy.
+  if(ctx.entrenoHoy && ctx.planManana){
+    if(ctx.planManana.esDescanso) msg+=' Mañana, descanso.';
+    else{
+      const descManana=ctx.planDesc(ctx.planManana);
+      if(descManana && descManana!=='entreno planificado') msg+=` Mañana toca ${descManana}.`;
+    }
+  }
+  return msg;
 }
 
 function renderDailyCoachMessage(){
   const box=document.getElementById('dailyCoachMsg');
   if(!box)return;
-  // 1) Plantilla al instante — coste 0, siempre disponible (free tier)
+  // Plantilla local, coste 0 — sin llamada a la IA. Antes había un segundo
+  // paso que "mejoraba" esto con una consulta a Anthropic; se quitó porque
+  // gastaba consultas del contador del usuario por algo que no percibía
+  // como valioso, y encima sin que entendiera por qué bajaba el contador.
   const tpl=getDailyCoachMessage();
   box.innerHTML=`<div style="font-size:15px;color:var(--text);line-height:1.5;font-weight:500">${tpl}</div>`;
-
-  // 2) Si hay API key (premium), intenta mejorar con IA (cacheado 1 vez/día).
-  //    Fallback silencioso a la plantilla si no hay key, no hay datos, o la llamada falla.
-  const key=getApiKey();
-  if(!key) return;
-  if((S.entrenamientos||[]).length===0) return; // sin datos no gastamos llamada
-  getAIDailyMessage(key).then(aiMsg=>{
-    if(aiMsg && box.isConnected){
-      box.innerHTML=`<div style="font-size:15px;color:var(--text);line-height:1.5;font-weight:500">${aiMsg}</div>`;
-    }
-  }).catch(()=>{}); // se queda la plantilla
-}
-
-// Firma del contexto: si cambia el nº de entrenos/planes/eventos, se regenera el mensaje del día
-function dailyMsgSignature(){
-  return `${(S.entrenamientos||[]).length}-${(S.planes||[]).length}-${(S.eventos||[]).length}`;
-}
-
-// Evita llamadas duplicadas si el Dashboard se re-renderiza varias veces el mismo día
-let _aiDailyPromise=null, _aiDailyKey='';
-
-// Genera el mensaje diario con IA. Cacheado en localStorage: 1 llamada/día por firma.
-async function getAIDailyMessage(key){
-  const today=hoyISO();
-  const sig=dailyMsgSignature();
-  const cacheKey=today+'|'+sig;
-
-  // Caché persistente (localStorage)
-  try{
-    const cached=JSON.parse(localStorage.getItem('locorunner_dailymsg')||'null');
-    if(cached && cached.date===today && cached.sig===sig && cached.msg) return cached.msg;
-  }catch(e){}
-
-  // Caché en memoria: si ya hay una petición en curso para esta clave, reúsala
-  if(_aiDailyPromise && _aiDailyKey===cacheKey) return _aiDailyPromise;
-  _aiDailyKey=cacheKey;
-
-  _aiDailyPromise=(async()=>{
-    const ctx=dailyMsgContext();
-    const a=S.athlete||{};
-    const coachCfg=S.coach||{genero:'masculino',estilo:'exigente'};
-    const N=coachCfg.genero==='femenino'?'Sara':'Alex';
-    const estiloDesc={
-      exigente:'directo, seco, profesional; primero el dato, sin adornos ni exclamaciones vacías',
-      entusiasta:'cálido, enérgico, contagioso; celebra los progresos con energía real',
-      critico:'clínico, preciso, sin adornos emocionales; señala lo que limita, sin elogios sin mérito',
-      gracioso:'irreverente y con chispa; analogías absurdas pero certeras, y cada broma lleva un dato',
-    }[coachCfg.estilo]||'directo y cercano';
-
-    // Contexto compacto (barato en tokens)
-    const last=ctx.last;
-    const ultStr=last
-      ? `Último entreno: ${diaSemana(last.fecha)} ${fmtD(last.fecha)}, ${last.tipo} de ${last.dist}km${last.ritmo?` a ${fmt(last.ritmo)}/km`:''} (hace ${ctx.diasSinCorrer}d).`
-      : 'Sin entrenos recientes.';
-    const semStr=`Km esta semana: ${ctx.kmSem.toFixed(1)}.`;
-    const tendStr=ctx.tendencia>0.02?'Su ritmo reciente está mejorando.':ctx.tendencia<-0.02?'Su ritmo reciente ha empeorado un poco.':'';
-    const carreraStr=ctx.nextEv?`Próxima carrera: ${ctx.nextEv.nombre} en ${ctx.nextEv.diff}d.`:'';
-    const planStr=ctx.planHoy
-      ? `HOY tiene planificado: ${ctx.planDesc(ctx.planHoy)}.`
-      : (ctx.nextPlan?`Próximo entreno planificado: ${ctx.planDesc(ctx.nextPlan)} el ${diaSemana(ctx.nextPlan.fecha)} (en ${ctx.nextPlan.diff}d).`:'');
-
-    const sys=`Eres ${N}, entrenador${coachCfg.genero==='femenino'?'a':''} personal de running. Tu estilo: ${estiloDesc}. Escribe UN mensaje de bienvenida diario para ${a.nombre||'el corredor'}, que lo verá al abrir su app hoy. REGLAS: 1-2 frases, máximo 30 palabras. Referencia UN dato concreto de su contexto (un entreno pasado, su semana, o su plan/carrera próxima) — no genérico. Segunda persona, con tu personalidad. Nada de "Hola" ni saludos. Sin markdown ni comillas. Máximo 1 emoji si encaja con tu estilo. Devuelve solo el mensaje.`;
-    const user=`Contexto de hoy (${diaSemana(today)} ${fmtD(today)}):\n${ultStr}\n${semStr} ${tendStr}\n${carreraStr}\n${planStr}\nEscribe el mensaje del día.`;
-
-    const res=await fetch(apiUrl(),{
-      method:'POST',
-      headers:apiHeaders(key),
-      body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:120,system:sys,messages:[{role:'user',content:user}]})
-    });
-    if(!res.ok) throw new Error('api '+res.status);
-    trackUsage(res);
-    const data=await res.json();
-    let msg=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ').trim();
-    if(!msg) throw new Error('empty');
-    msg=msg.replace(/^["'«»"']+|["'«»"']+$/g,'').trim();     // quita comillas envolventes
-    msg=msg.replace(/</g,'&lt;').replace(/>/g,'&gt;');         // seguridad HTML mínima
-    try{ localStorage.setItem('locorunner_dailymsg',JSON.stringify({date:today,sig,msg})); }catch(e){}
-    return msg;
-  })();
-
-  try{ return await _aiDailyPromise; }
-  finally{ if(_aiDailyKey===cacheKey) _aiDailyPromise=null; }
 }
 
 function renderDash(el){
@@ -5006,8 +5005,8 @@ async function stravaSync(silent){
 }
 
 // Se llama al arrancar la app: sincroniza como mucho 1 vez al día por
-// dispositivo, aunque se abra la app muchas veces — mismo criterio que el
-// mensaje diario del coach (dailyMsgSignature). Nunca interrumpe (silent=true).
+// dispositivo, aunque se abra la app muchas veces — mismo criterio de "una
+// vez por día" que el mensaje diario del coach. Nunca interrumpe (silent=true).
 function autoSyncStravaIfNeeded(){
   const c=S.conexiones?.strava;
   if(!c||!c.conectado) return;
