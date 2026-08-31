@@ -1007,6 +1007,7 @@ function closeSidebar(){
   document.getElementById('sidebarOverlay')?.classList.remove('show');
 }
 function go(v){
+  if(v!=='perfil') ocultarBarraGuardar();
   view=v;
   closeSidebar();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
@@ -3876,6 +3877,7 @@ function checkCumpleanos(){
 }
 function showCumpleanosModal(){
   document.getElementById('cumpleModal')?.remove();
+  lanzarConfetti();
   const modal=document.createElement('div');
   modal.id='cumpleModal';
   modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
@@ -3883,10 +3885,55 @@ function showCumpleanosModal(){
   <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.75rem;max-width:380px;width:100%;text-align:center;animation:fadeInUp .25s ease">
     <div style="font-size:40px;margin-bottom:.5rem">🎂</div>
     <div style="font-family:'Bebas Neue';font-size:22px;letter-spacing:1.5px;color:var(--acc);margin-bottom:.6rem">¡FELIZ CUMPLEAÑOS${S.athlete?.nombre?', '+esc(S.athlete.nombre).toUpperCase():''}!</div>
-    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:1.2rem">Todo el equipo de Locorunner te desea un gran día — y una gran vuelta al sol llena de buenos kilómetros. 🎉</div>
-    <button onclick="document.getElementById('cumpleModal').remove()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px 20px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">GRACIAS 🎈</button>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:1.2rem">Locorunner te desea un gran día y una gran vuelta al sol ¡¡llena de buenos kilómetros!!</div>
+    <button onclick="document.getElementById('cumpleModal').remove();pararConfetti()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px 20px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">GRACIAS 🎈</button>
   </div>`;
   document.body.appendChild(modal);
+}
+// Confetti de cumpleaños — canvas puro, sin librería externa. Dura mientras
+// el modal esté abierto; se para al pulsar "Gracias" (pararConfetti).
+function lanzarConfetti(){
+  pararConfetti();
+  const canvas=document.createElement('canvas');
+  canvas.id='confettiCanvas';
+  canvas.style.cssText='position:fixed;inset:0;z-index:10001;pointer-events:none';
+  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx=canvas.getContext('2d');
+  const colores=['#FF4D6D','#7CFF6B','#FFD43D','#45C4FF','#FF8A3D'];
+  const piezas=[];
+  for(let i=0;i<160;i++){
+    piezas.push({
+      x:Math.random()*canvas.width,
+      y:-20-Math.random()*canvas.height,
+      w:5+Math.random()*6,
+      h:8+Math.random()*8,
+      color:colores[Math.floor(Math.random()*colores.length)],
+      vy:2+Math.random()*3,
+      vx:(Math.random()-0.5)*2.5,
+      rot:Math.random()*360,
+      vrot:(Math.random()-0.5)*12
+    });
+  }
+  function tick(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    piezas.forEach(p=>{
+      p.y+=p.vy; p.x+=p.vx; p.rot+=p.vrot;
+      if(p.y>canvas.height+20){ p.y=-20; p.x=Math.random()*canvas.width; }
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.color;
+      ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+    });
+    window._confettiAnimId=requestAnimationFrame(tick);
+  }
+  tick();
+}
+function pararConfetti(){
+  if(window._confettiAnimId) cancelAnimationFrame(window._confettiAnimId);
+  document.getElementById('confettiCanvas')?.remove();
 }
 async function sendCumpleanosEmail(){
   const token=window._authSession?.access_token;
@@ -9021,14 +9068,14 @@ function renderPerfil(el){
     <div class="grid2" style="margin-top:1rem">
       <div>
         <div style="font-size:10px;color:var(--text2);margin-bottom:4px">🎂 Día de cumpleaños — opcional</div>
-        <select id="f-cumpledia" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
+        <select id="f-cumpledia" onchange="mostrarBarraGuardar()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
           <option value="">Sin especificar</option>
           ${Array.from({length:31},(_,i)=>i+1).map(d=>`<option value="${d}" ${a.cumpleMD&&parseInt(a.cumpleMD.split('-')[1])===d?'selected':''}>${d}</option>`).join('')}
         </select>
       </div>
       <div>
         <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Mes</div>
-        <select id="f-cumplemes" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
+        <select id="f-cumplemes" onchange="mostrarBarraGuardar()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
           <option value="">Sin especificar</option>
           ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m,i)=>`<option value="${i+1}" ${a.cumpleMD&&parseInt(a.cumpleMD.split('-')[0])===i+1?'selected':''}>${m}</option>`).join('')}
         </select>
@@ -9092,10 +9139,9 @@ function renderPerfil(el){
     </div>
     <div style="margin-top:.75rem">
       <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Historial lesiones</div>
-      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:12px;resize:vertical;outline:none;min-height:56px" id="f-lesiones">${esc(a.lesiones)}</textarea>
+      <textarea style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:12px;resize:vertical;outline:none;min-height:56px" id="f-lesiones" oninput="mostrarBarraGuardar()">${esc(a.lesiones)}</textarea>
     </div>
     <div style="margin-top:1rem;display:flex;gap:8px">
-      <button class="btn btn-acc" onclick="savePerfil()">💾 Guardar</button>
       <button class="btn btn-ghost" onclick="resetAllData()">Reset datos</button>
     </div>
   </div>
@@ -9185,7 +9231,7 @@ function renderPerfil(el){
   ${renderCyclePanel()}
   ${renderDevResetPanel()}`;
 }
-function pf(lbl,key,val,type){return`<div><div style="font-size:10px;color:var(--text2);margin-bottom:4px">${lbl}</div><input type="${type}" id="f-${key}" value="${val}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:12px;outline:none"></div>`;}
+function pf(lbl,key,val,type){return`<div><div style="font-size:10px;color:var(--text2);margin-bottom:4px">${lbl}</div><input type="${type}" id="f-${key}" value="${val}" oninput="mostrarBarraGuardar()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:12px;outline:none"></div>`;}
 function setGymMode(mode){
   if(!S.athlete) return;
   S.athlete.gymMode=mode;
@@ -9246,6 +9292,25 @@ function removeEntrenoFijo(i){
   go('perfil');
 }
 
+// Barra fija de "cambios sin guardar" — sustituye al botón "Guardar" que
+// quedaba perdido en mitad de la página de Mi Perfil. Aparece pegada abajo
+// en cuanto se toca cualquier campo de Datos personales/Objetivo/Cumpleaños,
+// se queda visible aunque bajes por la página, y desaparece al guardar.
+function mostrarBarraGuardar(){
+  if(document.getElementById('barraGuardarPerfil')) return; // ya visible
+  const bar=document.createElement('div');
+  bar.id='barraGuardarPerfil';
+  bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9000;background:var(--bg2);border-top:1px solid var(--border2);padding:12px 16px;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 -4px 16px rgba(0,0,0,.3);animation:fadeInUp .2s ease';
+  bar.innerHTML=`
+    <span style="font-size:12px;color:var(--text2)">Tienes cambios sin guardar</span>
+    <button onclick="savePerfil()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">💾 GUARDAR</button>
+  `;
+  document.body.appendChild(bar);
+}
+function ocultarBarraGuardar(){
+  document.getElementById('barraGuardarPerfil')?.remove();
+}
+
 function savePerfil(){
   ['nombre','altura','peso','edad','fcmax','fcreposo','objetivo','objetivo_fecha','objetivo_ritmo','lesiones'].forEach(k=>{
     const el=document.getElementById('f-'+k);
@@ -9257,6 +9322,7 @@ function savePerfil(){
   S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
   save();
   updateTopbar();
+  ocultarBarraGuardar();
   showToast('✅ Perfil guardado','var(--acc)');
 }
 
