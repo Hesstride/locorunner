@@ -2483,7 +2483,7 @@ function buildCrossTrainingPanel(E){
       ${semanasReal.map(s=>`
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%">
         <div style="width:100%;display:flex;flex-direction:column-reverse;height:80px;justify-content:flex-start;border-radius:4px 4px 0 0;overflow:hidden">
-          ${s.total===0?`<div style="width:100%;height:4px;background:var(--bg4)"></div>`:CROSS_TRAINING_CATS.filter(c=>s.porCat[c.key]>0).map(c=>`
+          ${s.total===0?'':CROSS_TRAINING_CATS.filter(c=>s.porCat[c.key]>0).map(c=>`
           <div style="width:100%;height:${Math.max(6,Math.round((s.porCat[c.key]/maxTotal)*80))}px;background:${c.color}" title="${c.label}: ${s.porCat[c.key]}"></div>`).join('')}
         </div>
         <div style="font-size:9px;color:var(--text3)">${s.label}</div>
@@ -8862,7 +8862,7 @@ function showEsfuerzoModal(i){
         <span style="font-size:13px;color:var(--text);font-weight:600">${n.label}</span>
       </button>`).join('')}
     </div>
-    <button onclick="document.getElementById('esfuerzoModal').remove()" style="width:100%;background:transparent;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Space Grotesk';margin-top:1rem">Prefiero no decirlo</button>
+    <button onclick="document.getElementById('esfuerzoModal').remove();afterEsfuerzoFlow(${i})" style="width:100%;background:transparent;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline;font-family:'Space Grotesk';margin-top:1rem">Prefiero no decirlo</button>
   </div>`;
   document.body.appendChild(modal);
 }
@@ -8872,9 +8872,67 @@ function setEsfuerzoPlan(i,key){
   document.getElementById('esfuerzoModal')?.remove();
   go('planes');
   showToast('Esfuerzo registrado','var(--acc)');
+  afterEsfuerzoFlow(i);
 }
 function esfuerzoInfo(key){ return NIVELES_ESFUERZO.find(n=>n.key===key); }
 
+// Texto corto del tipo de plan, leído de su contenido markdown
+function descPlanTexto(p){
+  if(!p) return '';
+  if(p.esDescanso) return 'descanso';
+  const t=(p.contenido||'').match(/\*\*Tipo:\*\*\s*([^\n|]+)/);
+  if(t&&t[1].trim()) return t[1].trim().toLowerCase();
+  const h=(p.contenido||'').match(/##\s*🎯\s*ENTRENAMIENTO DE HOY\s*[—-]\s*([^\n]+)/i);
+  if(h&&h[1].trim()) return h[1].trim().toLowerCase();
+  return 'entreno planificado';
+}
+// Tras registrar (o saltar) el esfuerzo: si el plan era de gimnasio, se
+// ofrece registrarlo también como entreno real. Antes, marcar "hecho" en
+// el plan solo marcaba una casilla — no creaba ningún dato en el
+// historial, así que nunca contaba en "Actividad cruzada" ni en ningún
+// otro sitio que lea S.entrenamientos.
+function afterEsfuerzoFlow(i){
+  const plan=S.planes[i];
+  if(!plan) return;
+  const tipoDetectado=clasificarTipoEntreno(descPlanTexto(plan)).label;
+  if(tipoDetectado==='Gimnasio') setTimeout(()=>showRegistrarGimnasioModal(plan),300);
+}
+function showRegistrarGimnasioModal(plan){
+  document.getElementById('gymMirrorModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='gymMirrorModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:380px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:18px;letter-spacing:1.5px;color:var(--text);margin-bottom:.5rem">🏋️ ¿REGISTRAMOS EL GIMNASIO?</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:1rem">Para que cuente en "Actividad cruzada" y en tu historial, hace falta guardarlo como entreno — marcar el plan como hecho por sí solo no basta.</div>
+    <div style="margin-bottom:1rem">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Duración aproximada (minutos)</div>
+      <input type="number" id="gymMinutos" min="1" placeholder="45" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 10px;color:var(--text);font-size:13px;box-sizing:border-box;font-family:'Space Grotesk'">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="registrarGimnasioDesdeplan(${plan.id})" style="flex:1;background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">GUARDAR</button>
+      <button onclick="document.getElementById('gymMirrorModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 14px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Space Grotesk'">Ahora no</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function registrarGimnasioDesdeplan(planId){
+  const plan=(S.planes||[]).find(p=>p.id===planId);
+  if(!plan) return;
+  const minutos=parseFloat(document.getElementById('gymMinutos')?.value)||45;
+  if(!S.entrenamientos) S.entrenamientos=[];
+  S.entrenamientos.push({
+    id:Date.now(), fecha:plan.fecha, tipo:'Fuerza', deporte:'Fuerza / Gimnasio',
+    dist:0, secs:Math.round(minutos*60), ritmo:0,
+    fc:null, cad:null, ts:null, zan:null, hrz:null, vo2est:null, zapatilla:null,
+    notas:'Gimnasio (desde plan)', origen:'plan', origenPlanId:plan.id
+  });
+  S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  save();
+  document.getElementById('gymMirrorModal')?.remove();
+  showToast('✅ Gimnasio registrado en tu historial','var(--acc)');
+}
 function markNoRealizado(i){
   if(!S.planes[i])return;
   S.planes[i].noRealizado=true;
@@ -10263,10 +10321,39 @@ async function checkAuthGateAndBoot(){
   const { data }=await client.auth.getSession();
   if(data?.session){
     window._authSession=data.session;
+    // Comprobación de baneo — UNA vez al iniciar sesión, no en cada mensaje
+    // del chat (evitar una llamada extra a Supabase por cada request).
+    const banned=await checkIfBanned(data.session.access_token);
+    if(banned){ showBannedScreen(); return; }
     bootAppAfterAuth();
   } else {
     showAuthGate();
   }
+}
+// Si la llamada falla (red caída, etc.) se asume que NO está baneado — nunca
+// bloquear a alguien por un fallo de conexión, solo por una decisión real.
+async function checkIfBanned(token){
+  try{
+    const res=await fetch(LOCORUNNER_ADMIN_URL+'/api/check-banned',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}
+    });
+    if(!res.ok) return false;
+    const data=await res.json();
+    return !!data.banned;
+  }catch(e){ return false; }
+}
+function showBannedScreen(){
+  document.body.innerHTML='';
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:#0a0a0f;z-index:99999;display:flex;align-items:center;justify-content:center;padding:1.5rem;text-align:center';
+  overlay.innerHTML=`
+  <div style="max-width:400px">
+    <div style="font-size:40px;margin-bottom:1rem">🚫</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;color:#ff4d6d;margin-bottom:.8rem">CUENTA SUSPENDIDA</div>
+    <div style="font-size:14px;color:#a0a0b0;line-height:1.6">Tu acceso a Locorunner ha sido suspendido. Si crees que es un error, contacta con soporte.</div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 checkAuthGateAndBoot();
 
