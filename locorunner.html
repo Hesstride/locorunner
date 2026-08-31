@@ -2511,8 +2511,9 @@ const DIST_EVENTO_KM={'5K':5,'10K':10,'15K':15,'Media Maratón':21.097,'Maratón
 
 function distanciaEventoKm(ev){
   if(!ev)return null;
+  if(ev.dist==='Otra' && ev.distKm) return ev.distKm; // campo explícito, prioridad sobre adivinar
   if(DIST_EVENTO_KM[ev.dist])return DIST_EVENTO_KM[ev.dist];
-  // "Otra": intentar deducir del nombre
+  // Fallback solo si no hay distKm: intentar deducir del nombre (poco fiable)
   const m=(ev.nombre||'').match(/(\d+(?:[.,]\d+)?)\s*k/i);
   if(m)return parseFloat(m[1].replace(',','.'));
   return null;
@@ -3600,9 +3601,13 @@ function showAddEventModal(prefillDate='', editId=null){
       </div>
       <div>
         <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Distancia</div>
-        <select id="ev-dist" style="${selStyle()}">
+        <select id="ev-dist" onchange="document.getElementById('ev-distkm-wrap').style.display=this.value==='Otra'?'block':'none'" style="${selStyle()}">
           ${['5K','10K','15K','Media Maratón','Maratón','50K','100K','Otra'].map(d=>`<option${ev&&ev.dist===d?' selected':''}>${d}</option>`).join('')}
         </select>
+      </div>
+      <div id="ev-distkm-wrap" style="display:${ev&&ev.dist==='Otra'?'block':'none'}">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">¿Cuántos km tiene exactamente?</div>
+        <input type="number" id="ev-distkm" step="0.1" min="0" value="${ev&&ev.distKm?ev.distKm:''}" placeholder="Ej: 6.5" style="${inputStyle()}">
       </div>
       ${si('Desnivel positivo estimado (m) — opcional','ev-desnivel',ev&&ev.desnivel?ev.desnivel:'','number','0')}
       ${si('Notas','ev-notas',ev?(ev.notas||''):'','text','Objetivo principal · batir marca · probar nueva estrategia · carrera de preparación')}
@@ -3621,11 +3626,16 @@ function saveEvento(editId=null){
   if(!nombre){showToast('⚠️ Escribe el nombre del evento','var(--acc3)');return;}
   const fecha=document.getElementById('ev-fecha')?.value||'';
   if(!fecha){showToast('⚠️ Indica la fecha del evento','var(--acc3)');return;}
+  const distSel=document.getElementById('ev-dist')?.value||'Media Maratón';
+  if(distSel==='Otra' && !parseFloat(document.getElementById('ev-distkm')?.value)){
+    showToast('⚠️ Indica cuántos km tiene la carrera','var(--acc3)');return;
+  }
   const datos={
     nombre,
     fecha,
     tipo:document.getElementById('ev-tipo')?.value||'Asfalto',
-    dist:document.getElementById('ev-dist')?.value||'Media Maratón',
+    dist:distSel,
+    distKm:distSel==='Otra'?(parseFloat(document.getElementById('ev-distkm')?.value)||null):null,
     desnivel:parseFloat(document.getElementById('ev-desnivel')?.value)||0,
     notas:document.getElementById('ev-notas')?.value||''
   };
@@ -3705,10 +3715,14 @@ function showAddPastRaceModal(editId=null){
         </div>
         <div>
           <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Distancia</div>
-          <select id="ev-dist" style="${selStyle()}">
+          <select id="ev-dist" onchange="document.getElementById('ev-distkm-wrap').style.display=this.value==='Otra'?'block':'none'" style="${selStyle()}">
             ${['5K','10K','15K','Media Maratón','Maratón','50K','100K','Otra'].map(d=>`<option${ev&&ev.dist===d?' selected':''}>${d}</option>`).join('')}
           </select>
         </div>
+      </div>
+      <div id="ev-distkm-wrap" style="display:${ev&&ev.dist==='Otra'?'block':'none'}">
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">¿Cuántos km tiene exactamente?</div>
+        <input type="number" id="ev-distkm" step="0.1" min="0" value="${ev&&ev.distKm?ev.distKm:''}" placeholder="Ej: 6.5" style="${inputStyle()}">
       </div>
       ${si('Desnivel positivo (m) — opcional','ev-desnivel',ev&&ev.desnivel?ev.desnivel:'','number','0')}
       <div>
@@ -3741,11 +3755,16 @@ function saveEventoConResultado(editId=null){
   if(!fecha){showToast('⚠️ Indica la fecha de la carrera','var(--acc3)');return;}
   const tiempoSecs=parseTiempoCarrera();
   if(!tiempoSecs){showToast('⚠️ Indica tu tiempo (al menos minutos o segundos)','var(--acc3)');return;}
+  const distSel2=document.getElementById('ev-dist')?.value||'Media Maratón';
+  if(distSel2==='Otra' && !parseFloat(document.getElementById('ev-distkm')?.value)){
+    showToast('⚠️ Indica cuántos km tiene la carrera','var(--acc3)');return;
+  }
   const datos={
     nombre,
     fecha,
     tipo:document.getElementById('ev-tipo')?.value||'Asfalto',
-    dist:document.getElementById('ev-dist')?.value||'Media Maratón',
+    dist:distSel2,
+    distKm:distSel2==='Otra'?(parseFloat(document.getElementById('ev-distkm')?.value)||null):null,
     desnivel:parseFloat(document.getElementById('ev-desnivel')?.value)||0,
     resultado:{
       corrida:true,
@@ -3796,6 +3815,91 @@ function sincronizarEntrenoDesdeCarrera(evento){
 // Aviso automático: al pasar la fecha de un evento sin resultado registrado
 // aún, se pregunta si se corrió. Como mucho una vez al día por carrera
 // (mismo criterio que el mensaje diario), nunca se pierde si se ignora.
+// Comprueba si un entreno recién importado (FIT o Strava) coincide en fecha
+// con un evento programado que todavía no tiene resultado. Antes solo se
+// preguntaba "¿corriste esta carrera?" al día siguiente (checkCarrerasPendientes,
+// más abajo), obligando a meter el tiempo a mano aunque ya se hubiera
+// sincronizado la actividad real. Ahora se pregunta al momento, con los
+// datos reales ya rellenos — sin tener que escribir nada.
+function checkEntrenoMatchesEvento(entreno){
+  if(!entreno || entreno.origen==='carrera') return;
+  const evento=(S.eventos||[]).find(e=>e.fecha===entreno.fecha && !e.resultado);
+  if(!evento) return;
+  setTimeout(()=>showEventoMatchModal(entreno, evento), 600);
+}
+function showEventoMatchModal(entreno, evento){
+  document.getElementById('eventoMatchModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='eventoMatchModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.5rem;max-width:400px;width:100%;animation:fadeInUp .2s ease">
+    <div style="font-family:'Bebas Neue';font-size:19px;letter-spacing:1.5px;color:var(--acc);margin-bottom:.5rem">🏁 ¿ES ESTA TU CARRERA?</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:.5rem">Tienes programada <strong style="color:var(--text)">${esc(evento.nombre)}</strong> hoy, y acabas de importar esta actividad:</div>
+    <div style="background:var(--bg3);border-radius:var(--r2);padding:.7rem;margin-bottom:1.1rem;font-size:12px;color:var(--text)">${entreno.dist}km · ${fmt(entreno.ritmo)}/km · ${fmtT(entreno.secs)}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="confirmarEntrenoEsCarrera(${entreno.id},${evento.id})" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">SÍ, ES ESTA CARRERA</button>
+      <button onclick="document.getElementById('eventoMatchModal').remove()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;color:var(--text2);font-size:12px;font-family:'Space Grotesk'">No, es un entreno normal</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+// Convierte el entreno ya importado en el resultado oficial de la carrera —
+// sin crear una segunda entrada, este mismo entreno pasa a ser el registro
+// de la carrera (mismo patrón que sincronizarEntrenoDesdeCarrera, pero al revés:
+// aquí el entreno ya existe, y lo que se actualiza es el evento).
+function confirmarEntrenoEsCarrera(entrenoId, eventoId){
+  const entreno=(S.entrenamientos||[]).find(e=>e.id===entrenoId);
+  const evento=(S.eventos||[]).find(e=>e.id===eventoId);
+  if(!entreno||!evento) return;
+  evento.resultado={corrida:true, tiempoSecs:entreno.secs, comentario:entreno.notas||'', fechaRegistro:new Date().toISOString()};
+  entreno.origen='carrera'; entreno.origenEventoId=evento.id; entreno.tipo='Carrera';
+  save();
+  document.getElementById('eventoMatchModal')?.remove();
+  showToast(`✅ Marcado como tu carrera: ${evento.nombre}`,'var(--acc)');
+  if(view==='calendario') go('calendario');
+}
+
+// Comprueba si hoy es el cumpleaños del atleta — como mucho 1 vez al año.
+// Aviso festivo en la app + email, usando el mismo patrón seguro que el
+// aviso de consultas restantes (JWT verificado, nunca un email a ciegas).
+function checkCumpleanos(){
+  const md=S.athlete?.cumpleMD;
+  if(!md) return;
+  const hoyMD=hoyISO().slice(5); // 'MM-DD'
+  if(md!==hoyMD) return;
+  const anio=hoyISO().slice(0,4);
+  if(localStorage.getItem('locorunner_cumple_sent')===anio) return;
+  localStorage.setItem('locorunner_cumple_sent', anio);
+  setTimeout(()=>showCumpleanosModal(), 800);
+  sendCumpleanosEmail();
+}
+function showCumpleanosModal(){
+  document.getElementById('cumpleModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='cumpleModal';
+  modal.style.cssText='position:fixed;inset:0;background:#000000cc;z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem';
+  modal.innerHTML=`
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r);padding:1.75rem;max-width:380px;width:100%;text-align:center;animation:fadeInUp .25s ease">
+    <div style="font-size:40px;margin-bottom:.5rem">🎂</div>
+    <div style="font-family:'Bebas Neue';font-size:22px;letter-spacing:1.5px;color:var(--acc);margin-bottom:.6rem">¡FELIZ CUMPLEAÑOS${S.athlete?.nombre?', '+esc(S.athlete.nombre).toUpperCase():''}!</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:1.2rem">Todo el equipo de Locorunner te desea un gran día — y una gran vuelta al sol llena de buenos kilómetros. 🎉</div>
+    <button onclick="document.getElementById('cumpleModal').remove()" style="background:var(--acc);color:#000;border:none;border-radius:6px;padding:10px 20px;cursor:pointer;font-family:'Bebas Neue';font-size:14px;letter-spacing:1px">GRACIAS 🎈</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+async function sendCumpleanosEmail(){
+  const token=window._authSession?.access_token;
+  if(!token) return;
+  try{
+    await fetch(LOCORUNNER_ADMIN_URL+'/api/send-birthday-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({nombre:S.athlete?.nombre||''})
+    });
+  }catch(e){}
+}
+
 function checkCarrerasPendientes(){
   const hoyStr=hoyISO();
   const pendiente=(S.eventos||[]).find(e=>e.fecha<hoyStr && !e.resultado && e.ultimoRecordatorio!==hoyStr);
@@ -5066,7 +5170,7 @@ async function stravaSync(silent){
       }
       const candidatos=buscarPosiblesDuplicados(nuevo);
       if(candidatos.length){ pendientesDup.push(nuevo); }
-      else{ S.entrenamientos.push(nuevo); importadas++; }
+      else{ S.entrenamientos.push(nuevo); importadas++; checkEntrenoMatchesEvento(nuevo); }
     }
     S.entrenamientos.sort((a,b)=>a.fecha.localeCompare(b.fecha));
     S.conexiones.strava.lastSync=new Date().toISOString();
@@ -7767,6 +7871,7 @@ PERFIL DEL ATLETA
 ══════════════════════════════════
 Nombre: ${a.nombre||'Atleta'} | Sexo: ${a.sexo||'hombre'} | Edad: ${a.edad}a
 Altura: ${a.altura}cm | Peso: ${a.peso}kg | FCmax: ${a.fcmax||175}ppm | FC reposo: ${a.fcreposo||52}ppm
+⚠️ Ten en cuenta la edad del atleta con base científica real al diseñar cargas y recuperación: a partir de los 40 la recuperación entre sesiones de calidad es más lenta y el riesgo de lesión por acumulación sube, conviene más días de descanso entre series/tempo y progresiones de volumen más conservadoras; a partir de los 50-55 esto se acentúa más. No lo menciones como advertencia genérica de "cuídate" — impleméntalo en las decisiones concretas del plan (frecuencia de calidad, progresión de volumen, prioridad de la fuerza).
 Zapatillas activas: ${(S.equipacion?.zapatillas||[]).filter(z=>z.activa).map(z=>z.nombre).join(', ')||'no registradas'}
 Lesiones previas: ${a.lesiones||'ninguna registrada'}
 Nivel / experiencia: **${nivelTxt}**
@@ -8914,6 +9019,22 @@ function renderPerfil(el){
       ${pf('FC reposo (ppm)','fcreposo',a.fcreposo,'number')}
     </div>
     <div class="grid2" style="margin-top:1rem">
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">🎂 Día de cumpleaños — opcional</div>
+        <select id="f-cumpledia" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
+          <option value="">Sin especificar</option>
+          ${Array.from({length:31},(_,i)=>i+1).map(d=>`<option value="${d}" ${a.cumpleMD&&parseInt(a.cumpleMD.split('-')[1])===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:4px">Mes</div>
+        <select id="f-cumplemes" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:'Space Grotesk';font-size:12px;outline:none">
+          <option value="">Sin especificar</option>
+          ${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m,i)=>`<option value="${i+1}" ${a.cumpleMD&&parseInt(a.cumpleMD.split('-')[0])===i+1?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:1rem">
       ${pf('Objetivo carrera','objetivo',a.objetivo,'text')}
       ${pf('Fecha objetivo','objetivo_fecha',a.objetivo_fecha,'text')}
       ${pf('Ritmo objetivo (/km)','objetivo_ritmo',a.objetivo_ritmo,'text')}
@@ -9130,6 +9251,9 @@ function savePerfil(){
     const el=document.getElementById('f-'+k);
     if(el)S.athlete[k]=['altura','peso','fcmax','fcreposo'].includes(k)?parseFloat(el.value):el.value;
   });
+  const cd=document.getElementById('f-cumpledia')?.value;
+  const cm=document.getElementById('f-cumplemes')?.value;
+  S.athlete.cumpleMD=(cd&&cm)?(String(cm).padStart(2,'0')+'-'+String(cd).padStart(2,'0')):'';
   S.athlete.objetivoUltimaConfirmacion=new Date().toISOString();
   save();
   updateTopbar();
@@ -9357,6 +9481,7 @@ async function handleFitFiles(fileList){
       };
       S.entrenamientos.push(newEnt);
       added++;
+      checkEntrenoMatchesEvento(newEnt);
     }catch(e){
       failed++;
       failedNames.push(file.name);
@@ -10045,6 +10170,7 @@ function bootAppAfterAuth(){
   autoSyncStravaIfNeeded();
   checkObjetivoRecordatorio();
   checkCarrerasPendientes();
+  checkCumpleanos();
   go('dash');
   updateTopbar();
   updateStravaStatus();
