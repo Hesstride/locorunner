@@ -4445,7 +4445,7 @@ function renderList(el){
         <option value="">Asignar zapatilla a todos sin asignar…</option>
         ${shoes.map(z=>`<option value="${z.id}">${esc(z.nombre)}</option>`).join('')}
       </select>`:''}
-      <button class="btn btn-ghost" onclick="showAddTrainingModal()" style="font-size:11px">+ Añadir manual</button>
+      <button class="btn btn-ghost" onclick="showAddTrainingModal()" style="font-size:11px">+ Añadir datos de nuevo entreno</button>
       <button class="btn btn-ghost" onclick="go('chat')" style="font-size:11px">+ Añadir hablando con ${coachNombre()}</button>
       <button class="btn btn-ghost" onclick="showScoreInfo()" style="font-size:11px" title="¿Qué significan las notas A, B+, C?">❓ Notas</button>
     </div>
@@ -5376,6 +5376,9 @@ function buildImportDropdownHtml(){
   return `${stravaHtml}
     <button onclick="closeImportDropdown();document.getElementById('fitImportInput').click()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Space Grotesk';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
       📁 Importar archivo .FIT
+    </button>
+    <button onclick="closeImportDropdown();showAddTrainingModal()" style="width:100%;text-align:left;background:transparent;border:none;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-family:'Space Grotesk';font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      📝 Añadir datos de nuevo entreno
     </button>`;
 }
 // Refresca el contenido si el desplegable está abierto ahora mismo (p.ej.
