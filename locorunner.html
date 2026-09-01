@@ -112,8 +112,8 @@ body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-ser
 .logo{line-height:1;display:block}
 .logo svg{height:40px;width:auto;display:block}
 .logo .lr-word{fill:var(--text)}
-.logo .lr-eye{fill:none;stroke:var(--acc-t);stroke-width:6}
-.logo .lr-pupil{fill:var(--acc-t)}
+.logo .lr-eye{fill:none;stroke:var(--acc);stroke-width:6}
+.logo .lr-pupil{fill:var(--acc)}
 .tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .chip{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace}
 .chip.acc{border-color:color-mix(in srgb,var(--acc) 50%,transparent);color:var(--acc-t)}
@@ -5517,8 +5517,8 @@ function showAuthGate(){
   overlay.style.cssText='position:fixed;inset:0;background:var(--bg1);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto';
   overlay.innerHTML=`
   <div style="max-width:400px;width:100%;text-align:center;margin:auto">
-    <div style="font-family:'Bebas Neue';font-size:36px;letter-spacing:2px;color:var(--text);margin-bottom:.4rem">
-      L<span style="color:var(--acc)">O</span>C<span style="color:var(--acc)">O</span>RUNNER
+    <div class="logo" style="display:flex;justify-content:center;margin-bottom:.6rem">
+      <svg viewBox="0 0 325 96" role="img" aria-label="LocoRunner" style="width:220px;height:auto"><text class="lr-word" x="10" y="66" font-family="Bebas Neue,sans-serif" font-size="62">L</text><text class="lr-word" x="76" y="66" font-family="Bebas Neue,sans-serif" font-size="62">C</text><text class="lr-word" x="142" y="66" font-family="Bebas Neue,sans-serif" font-size="62" letter-spacing="1">RUNNER</text><circle class="lr-eye" cx="55" cy="42" r="16"/><circle class="lr-eye" cx="122" cy="46" r="12"/><circle class="lr-pupil" cx="55" cy="36" r="6"/><circle class="lr-pupil" cx="122" cy="41" r="4.5"/></svg>
     </div>
     <div style="font-size:13px;color:var(--text3);margin-bottom:1.5rem;line-height:1.5">Necesitas una cuenta para entrar.<br>Tus entrenos y datos siguen a salvo en este dispositivo — esto solo protege tu acceso.</div>
     <div id="authGateBody" style="text-align:left"></div>
