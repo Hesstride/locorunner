@@ -2388,15 +2388,30 @@ function limpiarInicioMd(s){
   return (s||'').replace(/^(?:[\s*_#>\-–—•·:|\[\(]|\p{Extended_Pictographic}|️)+/u,'');
 }
 function textoEsDescanso(s){
-  return /^(?:d[ií]a\s+de\s+)?(?:descanso|descans|repouso|repos|riposo|rest\b|day off|jour de repos|giorno di riposo)/i.test(limpiarInicioMd(s));
+  return /^(?:d[ií]a\s+(?:de\s+)?)?(?:descanso|descans|repouso|repos|riposo|rest\b|day off|off\b|libre\b|jour de repos|giorno di riposo)/i.test(limpiarInicioMd(s));
 }
 // ¿Es un día de descanso? Una sola regla para toda la app (antes cada sitio
 // miraba solo p.esDescanso, que dependía de que el texto empezara por
 // "DESCANSO" sin nada delante).
+// Quita delante del texto el día y la fecha ("LUNES 23/11 —", "Mañana:",
+// "23/11 ·") que ponen los planes pasados desde el chat.
+function quitarPrefijoDia(s){
+  return limpiarInicioMd(s).replace(/^(?:(?:hoy|ma[ñn]ana|lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|segunda|ter[çc]a|quarta|quinta|sexta|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|luned[ìi]|marted[ìi]|mercoled[ìi]|gioved[ìi]|venerd[ìi]|dilluns|dimarts|dimecres|dijous|divendres|dissabte|diumenge)\b\.?[\s,]*|\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?[\s,]*|[\s*_#>\-–—•·:|()\[\]]+)+/i,'');
+}
 function esPlanDescanso(p){
   if(!p) return false;
   if(p.esDescanso) return true;
+  // Planes generados con estructura (plan semanal): el tipo ya viene dado
+  if(p.estructura&&p.estructura.tipo==='descanso') return true;
   const c=p.contenido||'';
+  // Misma regla que usa la tarjeta del plan para pintarlo como "Descanso":
+  // si la tarjeta dice Descanso, el botón Hecho tiene que tratarlo igual.
+  const tp0=planTipoTexto(c), tt0=planTitulo(c);
+  if(tp0 && clasificarTipoEntreno(tp0.toLowerCase()).key==='descanso') return true;
+  if(!tp0 && tt0 && clasificarTipoEntreno(tt0.toLowerCase()).key==='descanso') return true;
+  // Primera línea con contenido real (saltando una cabecera que sea solo día/fecha)
+  const lineas0=c.split('\n').map(l=>quitarPrefijoDia(l).trim()).filter(Boolean);
+  if(lineas0.length&&textoEsDescanso(lineas0[0])) return true;
   const tipo=planTipoTexto(c); if(tipo && textoEsDescanso(tipo)) return true;
   const tit=planTitulo(c); if(tit && textoEsDescanso(tit)) return true;
   const primera=(c.split('\n').find(l=>l.trim())||'');
