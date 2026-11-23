@@ -6568,6 +6568,8 @@ function inicioDesdeFit(session,records){
   }
   return redondearUbicacion(lat,lon);
 }
+// Ciudades para dar contexto al mapa sin conexión (1 = grandes, 2 = capitales de provincia y similares)
+const MAPA_CIUDADES='Madrid|40.417|-3.704|1;Barcelona|41.385|2.173|1;Valencia|39.470|-0.376|1;Sevilla|37.389|-5.984|1;Zaragoza|41.649|-0.889|1;Málaga|36.721|-4.421|1;Bilbao|43.263|-2.935|1;Las Palmas|28.124|-15.430|1;Valladolid|41.652|-4.724|2;Murcia|37.992|-1.131|2;Palma|39.570|2.650|2;Santa Cruz de Tenerife|28.464|-16.251|2;Alicante|38.345|-0.481|2;Córdoba|37.888|-4.779|2;Vigo|42.240|-8.720|2;Gijón|43.532|-5.661|2;A Coruña|43.362|-8.411|2;Vitoria|42.847|-2.672|2;Granada|37.177|-3.599|2;Oviedo|43.361|-5.849|2;Pamplona|42.812|-1.646|2;Almería|36.834|-2.464|2;San Sebastián|43.318|-1.981|2;Santander|43.462|-3.810|2;Burgos|42.343|-3.697|2;Salamanca|40.970|-5.663|2;Logroño|42.465|-2.445|2;Badajoz|38.879|-6.970|2;Cáceres|39.475|-6.372|2;Huelva|37.261|-6.945|2;Cádiz|36.527|-6.288|2;Jaén|37.779|-3.785|2;León|42.598|-5.567|2;Tarragona|41.119|1.245|2;Lleida|41.617|0.620|2;Girona|41.979|2.821|2;Castellón|39.986|-0.051|2;Albacete|38.994|-1.858|2;Ciudad Real|38.986|-3.927|2;Toledo|39.863|-4.027|2;Cuenca|40.070|-2.137|2;Guadalajara|40.633|-3.167|2;Segovia|40.943|-4.109|2;Ávila|40.656|-4.700|2;Soria|41.764|-2.468|2;Zamora|41.503|-5.745|2;Palencia|42.010|-4.533|2;Ourense|42.336|-7.864|2;Lugo|43.012|-7.556|2;Pontevedra|42.431|-8.644|2;Huesca|42.136|-0.408|2;Teruel|40.344|-1.106|2;Santiago|42.878|-8.544|2;Ceuta|35.889|-5.321|2;Melilla|35.292|-2.938|2;Marbella|36.510|-4.883|2;Jerez|36.686|-6.137|2;Ibiza|38.907|1.432|2;Mahón|39.889|4.265|2;Andorra la Vella|42.507|1.522|2;Lisboa|38.722|-9.139|1;Oporto|41.150|-8.611|1;Faro|37.019|-7.930|2;Coímbra|40.203|-8.410|2;París|48.857|2.352|1;Burdeos|44.838|-0.579|1;Toulouse|43.605|1.444|1;Marsella|43.297|5.381|1;Lyon|45.764|4.836|1;Biarritz|43.483|-1.559|2;Perpiñán|42.699|2.895|2;Montpellier|43.611|3.877|2;Niza|43.710|7.262|2;Roma|41.903|12.496|1;Milán|45.464|9.190|1;Londres|51.507|-0.128|1;Dublín|53.350|-6.260|1;Bruselas|50.850|4.352|1;Ámsterdam|52.370|4.895|1;Berlín|52.520|13.405|1;Múnich|48.135|11.582|1;Viena|48.208|16.373|1;Zúrich|47.377|8.541|1;Rabat|34.020|-6.842|1;Tánger|35.759|-5.834|2;Casablanca|33.573|-7.590|1;Marrakech|31.629|-7.981|1;Nueva York|40.713|-74.006|1;Boston|42.360|-71.059|1;Chicago|41.878|-87.630|1;Ciudad de México|19.433|-99.133|1;Buenos Aires|-34.604|-58.382|1;Tokio|35.676|139.650|1;Atenas|37.984|23.728|1;Estocolmo|59.329|18.069|1;Copenhague|55.676|12.568|1;Praga|50.075|14.438|1;Varsovia|52.230|21.012|1'.split(';').map(x=>{const[n,la,lo,r]=x.split('|');const[px,py]=mapaProj(+lo,+la);return{n,x:px,y:py,r:+r};});
 let _mapaVB=null;
 function renderMapa(el){
   const E=(S.entrenamientos||[]);
@@ -6588,6 +6590,7 @@ function renderMapa(el){
     <div id="mapaWrap" style="position:relative;height:min(62vh,560px);border-radius:var(--r2);overflow:hidden;background:color-mix(in srgb, var(--acc2) 7%, var(--bg));touch-action:none;user-select:none">
       <svg id="mapaSvg" width="100%" height="100%" style="display:block;cursor:grab">
         <g id="mapaTierra" fill="var(--bg3)" stroke="var(--border2)" stroke-width="1" stroke-linejoin="round"></g>
+        <g id="mapaCiudades" pointer-events="none"></g>
         <g id="mapaPuntos"></g>
       </svg>
       <div style="position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px">
@@ -6606,7 +6609,7 @@ function renderMapa(el){
   const ajustar=()=>{
     if(!pts.length){ const [x1,y1]=mapaProj(-12,46), [x2,y2]=mapaProj(6,34); return {x:x1,y:y1,w:x2-x1,h:y2-y1}; }
     let x1=Math.min(...pts.map(p=>p.x)), x2=Math.max(...pts.map(p=>p.x)), y1=Math.min(...pts.map(p=>p.y)), y2=Math.max(...pts.map(p=>p.y));
-    const span=Math.max(x2-x1,y2-y1,1.2)*1.5, cx=(x1+x2)/2, cy=(y1+y2)/2;
+    const span=Math.max((x2-x1)*1.5,(y2-y1)*1.5,110), cx=(x1+x2)/2, cy=(y1+y2)/2;
     return {x:cx-span/2,y:cy-span/2,w:span,h:span};
   };
   let vb=ajustar();
@@ -6615,10 +6618,27 @@ function renderMapa(el){
     // mantener la proporción del contenedor
     const asp=W/H; let w=vb.w, h=vb.h; const cx=vb.x+w/2, cy=vb.y+h/2;
     if(w/h<asp) w=h*asp; else h=w/asp;
-    w=Math.min(Math.max(w,0.15),MAPA_W*1.2); h=w/asp;
+    w=Math.min(Math.max(w,10),MAPA_W*1.2); h=w/asp;
     vb={x:cx-w/2,y:cy-h/2,w,h};
     svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
     const k=W/vb.w; // píxeles por unidad
+    // Nombres de ciudades según el zoom, sin que se pisen entre sí
+    {
+      const verR=vb.w<1000?(vb.w<180?2:1):0, cajas=[], out=[];
+      const fsz=Math.round(11*getEscalaFuente());
+      MAPA_CIUDADES.filter(c=>c.r<=verR&&c.x>=vb.x&&c.x<=vb.x+vb.w&&c.y>=vb.y&&c.y<=vb.y+vb.h).sort((a,b)=>a.r-b.r).forEach(c=>{
+        const sx=(c.x-vb.x)*k, sy=(c.y-vb.y)*k;
+        // Si un entreno cae encima de la ciudad, el nombre se aparta del punto
+        const tapado=pts.some(p=>Math.abs((p.x-c.x)*k)<12&&Math.abs((p.y-c.y)*k)<12);
+        const dx=tapado?14:6, bw=c.n.length*fsz*0.58+dx+4, bh=fsz+4;
+        const caja={x1:sx-3,x2:sx+bw,y1:sy-bh/2,y2:sy+bh/2};
+        if(caja.x2>W-4) return;
+        if(cajas.some(q=>caja.x1<q.x2&&caja.x2>q.x1&&caja.y1<q.y2&&caja.y2>q.y1)) return;
+        cajas.push(caja);
+        out.push(`${tapado?'':`<circle cx="${c.x}" cy="${c.y}" r="${(c.r===1?2.6:2)/k}" fill="var(--text3)"/>`}<text x="${c.x+dx/k}" y="${c.y}" font-size="${fsz/k}" dominant-baseline="central" fill="var(--text2)" font-family="Space Grotesk" ${c.r===1?'font-weight="600"':''}>${c.n}</text>`);
+      });
+      document.getElementById('mapaCiudades').innerHTML=out.join('');
+    }
     // Agrupar puntos cercanos en pantalla (radio ~18 px)
     const rad=18/k, grupos=[];
     pts.forEach(p=>{ const gr=grupos.find(q=>Math.abs(q.x-p.x)<rad&&Math.abs(q.y-p.y)<rad); if(gr){ gr.items.push(p); } else grupos.push({x:p.x,y:p.y,items:[p]}); });
