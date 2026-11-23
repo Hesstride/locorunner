@@ -2701,6 +2701,39 @@ function tablaProximosDias(n){
   }
   return filas.join('\n');
 }
+// Etiqueta relativa ya calculada para el coach: "Sáb 21/11 · hace 2 días".
+// La IA calcula mal las restas de fechas: se las damos hechas.
+function fechaRelativa(iso){
+  if(!iso) return '';
+  const d=parseISO(String(iso).slice(0,10));
+  if(isNaN(d)) return String(iso);
+  const n=diasEntre(isoLocal(d),hoyISO());
+  const base=`${DIAS_CORTO[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const rel=n===0?'HOY':n===1?'AYER':n===2?'anteayer (hace 2 días)':n>0?`hace ${n} días`:n===-1?'mañana':`dentro de ${-n} días`;
+  return `${base} · ${rel}`;
+}
+// Últimos N días hacia atrás con su etiqueta relativa (complementa tablaProximosDias)
+function tablaDiasPasados(n){
+  const filas=[];
+  for(let i=1;i<=n;i++){
+    const iso=addDiasFecha(hoyISO(),-i);
+    const d=parseISO(iso);
+    filas.push(`${DIAS_SEMANA[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} = ${iso} ← ${i===1?'ayer':i===2?'anteayer':'hace '+i+' días'}`);
+  }
+  return filas.join('\n');
+}
+function horaLocal(d){d=d||new Date();return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+// Sello de fecha que se antepone a cada mensaje del chat al enviarlo a la IA.
+// Sin esto, un "hoy he hecho series" escrito el viernes llegaba el lunes como
+// si fuera de hoy. Los mensajes antiguos sin fecha se marcan como tal.
+function selloFechaMsg(m){
+  if(!m||!m.ts) return '[Mensaje antiguo, fecha desconocida: NO asumas que es de hoy]';
+  const d=new Date(m.ts);
+  const iso=isoLocal(d);
+  const n=diasEntre(iso,hoyISO());
+  const rel=n===0?'HOY':n===1?'AYER':`hace ${n} días`;
+  return `[Escrito el ${DIAS_SEMANA[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} a las ${horaLocal(d)} — ${rel}${n>0?'; "hoy"/"ayer" en este mensaje se refieren a ESA fecha':''}]`;
+}
 function cadIdeal(h){if(h>=190)return{min:158,max:165,opt:162};if(h>=182)return{min:160,max:167,opt:164};if(h>=172)return{min:162,max:170,opt:166};return{min:164,max:172,opt:168};}
 const CI = cadIdeal(S.athlete.altura);
 
@@ -3909,8 +3942,8 @@ async function onbGenerateFirst(){
     }
     const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n\n')||'—';
     // Guardar en el hilo del entrenador para dar continuidad
-    S.chatHistory.push({role:'user',content:'Genérame mi primer entrenamiento personalizado según mi perfil.'});
-    S.chatHistory.push({role:'assistant',content:reply});
+    S.chatHistory.push({ts:Date.now(),role:'user',content:'Genérame mi primer entrenamiento personalizado según mi perfil.'});
+    S.chatHistory.push({ts:Date.now(),role:'assistant',content:reply});
     save();
     onbRenderResult(reply);
   }catch(e){
@@ -10839,7 +10872,7 @@ REGLAS CRÍTICAS:
     }
     const reply = data?.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
     if(reply){
-      S.chatHistory.push({role:'assistant', content:reply});
+      S.chatHistory.push({ts:Date.now(),role:'assistant', content:reply});
       save();
       aiMsg(reply, false, true);
     } else aiMsg(t('chat.studies_fetch_fail'));
@@ -11157,7 +11190,7 @@ async function sendMsg(){
   // Las imágenes NO se guardan en el historial (llenaban el almacenamiento
   // local del móvil). Solo se envían en esta llamada; el coach devuelve un
   // resumen de texto (datos o descripción) que es lo que queda guardado.
-  const userEntry={role:'user',content:text};
+  const userEntry={ts:Date.now(),role:'user',content:text};
   if(snapshotImgs.length>0){ userEntry.nImgs=snapshotImgs.length; userEntry.imgResumen=''; }
   S.chatHistory.push(userEntry);
 
@@ -11187,13 +11220,13 @@ async function sendMsg(){
           const base64=img.data.includes(',')?img.data.split(',')[1]:img.data;
           contentParts.push({type:'image',source:{type:'base64',media_type:mediaType,data:base64}});
         });
-        contentParts.push({type:'text',text:m.content+'\n\n'+IMG_RESUMEN_INSTRUCCION});
+        contentParts.push({type:'text',text:selloFechaMsg(m)+'\n'+m.content+'\n\n'+IMG_RESUMEN_INSTRUCCION});
         messages.push({role:'user',content:contentParts});
       } else if(m.nImgs){
         // Imágenes de mensajes anteriores: ya no existen, va su resumen de texto
-        messages.push({role:'user',content:m.content+`\n\n[${m.nImgs} imagen(es) adjunta(s) en este mensaje; ya no disponible(s). Resumen de su contenido: ${m.imgResumen||'no disponible'}]`});
+        messages.push({role:'user',content:selloFechaMsg(m)+'\n'+m.content+`\n\n[${m.nImgs} imagen(es) adjunta(s) en este mensaje; ya no disponible(s). Resumen de su contenido: ${m.imgResumen||'no disponible'}]`});
       } else {
-        messages.push({role:'user',content:m.content});
+        messages.push({role:'user',content:selloFechaMsg(m)+'\n'+m.content});
       }
     } else messages.push({role:'assistant',content:m.content});
   }
@@ -11229,7 +11262,7 @@ async function sendMsg(){
     const {visible:reply,resumen}=separarResumenImagen(rawReply);
     if(snapshotImgs.length>0) userEntry.imgResumen=resumen;
     typing?.remove(); hideCoachWorking(); aiMsg(reply);
-    S.chatHistory.push({role:'assistant',content:reply}); save();
+    S.chatHistory.push({ts:Date.now(),role:'assistant',content:reply}); save();
 
     // If images were attached, try to extract metrics and update matching training
     if(snapshotImgs.length>0){
@@ -11361,7 +11394,7 @@ function buildSys(){
   // Last 5 workouts for recent form context
   const recent=E.slice(-5);
   const planTag=(e)=>{const pl=planDeEntreno(e);return pl?` | PROGRAMADO: ${resumenPlanCorto(pl,90)}`:' | (sin plan ese día)';};
-  const recentSummary=recent.map(e=>{const com=notaCorredor(e);const dep=(e.deporte&&e.deporte!=='Running')?`[${e.deporte}] `:'';return `  · ${e.fecha} | ${dep}${e.tipo} | ${e.dist}km | ${fmt(e.ritmo)}/km | FC:${e.fc||'—'} | Cad:${e.cad||'—'} | DN:${e.dn||0}m${planTag(e)}${com?`\n      → Comentario del corredor: "${com}"`:''}`;}).join('\n');
+  const recentSummary=recent.map(e=>{const com=notaCorredor(e);const dep=(e.deporte&&e.deporte!=='Running')?`[${e.deporte}] `:'';return `  · ${e.fecha} (${fechaRelativa(e.fecha)}) | ${dep}${e.tipo} | ${e.dist}km | ${fmt(e.ritmo)}/km | FC:${e.fc||'—'} | Cad:${e.cad||'—'} | DN:${e.dn||0}m${planTag(e)}${com?`\n      → Comentario del corredor: "${com}"`:''}`;}).join('\n');
 
   // Trend analysis
   const cadVals=E.filter(e=>e.cad).map(e=>e.cad);
@@ -11375,7 +11408,7 @@ function buildSys(){
 
   // Compact history — last 20 only to save tokens, ultra-compressed
   const allE = E.slice(-20);
-  const esummary=allE.map(e=>{const com=notaCorredor(e);const dep=(e.deporte&&e.deporte!=='Running')?`[${e.deporte}] `:'';return `${e.fecha}|${dep}${e.tipo}|${e.dist}km|${fmt(e.ritmo)}|FC${e.fc||'—'}|C${e.cad||'—'}|TS${e.ts||'—'}|DN${e.dn||0}m${com?` →"${com}"`:''}`;}).join('\n');
+  const esummary=allE.map(e=>{const com=notaCorredor(e);const dep=(e.deporte&&e.deporte!=='Running')?`[${e.deporte}] `:'';return `${e.fecha} (${fechaRelativa(e.fecha)})|${dep}${e.tipo}|${e.dist}km|${fmt(e.ritmo)}|FC${e.fc||'—'}|C${e.cad||'—'}|TS${e.ts||'—'}|DN${e.dn||0}m${com?` →"${com}"`:''}`;}).join('\n');
   const totalEntrenos = E.length;
 
   // Upcoming races from calendar
@@ -11413,7 +11446,7 @@ function buildSys(){
     ? planRecienteArr.map(p=>{
         const ent=entrenoDePlan(p);
         const est=p.completado?`✅ HECHO${ent?` (${ent.tipo} ${ent.dist}km a ${fmt(ent.ritmo)}/km)`:''}`:p.noRealizado?'❌ NO REALIZADO':'⏳ PENDIENTE';
-        return `  · ${diaSemana(p.fecha)} ${fechaLarga(p.fecha)} (${p.fecha})${p.fecha===hoyISO()?' ⟵ HOY':''} → ${resumenPlanCorto(p,140)} · ${est}`;
+        return `  · ${fechaLarga(p.fecha)} (${p.fecha}, ${fechaRelativa(p.fecha).split(' · ')[1]})${p.fecha===hoyISO()?' ⟵ HOY':''} → ${resumenPlanCorto(p,140)} · ${est}`;
       }).join('\n')
     : '  Sin plan en los últimos 7 días';
 
@@ -11510,12 +11543,16 @@ ESTADO DE FORMA ACTUAL
 Total km registrados: ${totalKm}km | Media semanal: ~${avgDistWeek}km/sem
 Cadencia: inicio ${avgCadFirst||'—'} → ahora ${avgCadRecent||'—'} p/min ${avgCadFirst&&avgCadRecent&&avgCadRecent>avgCadFirst?'(↑ MEJORA)':''}
 T.suelo reciente: ${avgTSRecent||'—'}ms ${avgTSRecent&&avgTSRecent<265?'(buena reactividad ✓)':''}
-Último entreno: ${last.fecha} (hace ${daysSinceLastStr}) | ${last.tipo} | ${last.dist}km a ${fmt(last.ritmo)}/km | Cad ${last.cad||'—'} | FC ${last.fc||'—'}${(()=>{try{const m=calcularMetricasRendimiento(E);return m.carga7?`\nCarga sRPE (minutos × esfuerzo) últimos 7 días: ${Math.round(m.carga7)}${m.ratio?` | ratio frente a la media de las 4 últimas semanas: ${m.ratio.toFixed(2)}`:''}${m.sinEsfuerzo7?` (${m.sinEsfuerzo7} sesiones sin esfuerzo registrado, contadas como moderadas)`:''}`:'';}catch(_){return '';}})()}
+Último entreno: ${fechaRelativa(last.fecha)} (${last.fecha}) | ${last.tipo} | ${last.dist}km a ${fmt(last.ritmo)}/km | Cad ${last.cad||'—'} | FC ${last.fc||'—'}${(()=>{try{const m=calcularMetricasRendimiento(E);return m.carga7?`\nCarga sRPE (minutos × esfuerzo) últimos 7 días: ${Math.round(m.carga7)}${m.ratio?` | ratio frente a la media de las 4 últimas semanas: ${m.ratio.toFixed(2)}`:''}${m.sinEsfuerzo7?` (${m.sinEsfuerzo7} sesiones sin esfuerzo registrado, contadas como moderadas)`:''}`:'';}catch(_){return '';}})()}
 
 ══════════════════════════════════
 CALENDARIO — DATO AUTORITATIVO, NO LO RECALCULES
 ══════════════════════════════════
-HOY ES: ${fechaLarga(hoyISO())} (${hoyISO()})
+HOY ES: ${fechaLarga(hoyISO())} (${hoyISO()}) — hora actual del atleta: ${horaLocal()}
+${(()=>{const n=last?diasEntre(last.fecha,hoyISO()):null;return n===null?'':n===0?'El último entreno registrado es de HOY.':`⚠️ HOY todavía NO hay ningún entreno registrado. El último es del ${fechaRelativa(last.fecha)}. Si el atleta habla de "el entreno" sin más, NO des por hecho que es de hoy: si no está claro a cuál se refiere, pregúntaselo.`;})()}
+
+Días pasados (para saber exactamente cuánto hace de cada cosa):
+${tablaDiasPasados(7)}
 
 Correspondencia exacta fecha ↔ día de la semana para los próximos 14 días:
 ${tablaProximosDias(14)}
@@ -11525,6 +11562,9 @@ ${tablaProximosDias(14)}
 - Usa EXCLUSIVAMENTE la tabla de arriba. Si una fecha no está en la tabla, no le pongas día de la semana: escribe solo la fecha.
 - Al nombrar un día, cópialo literalmente de la tabla. Ejemplo correcto: si la tabla dice "Miércoles 15/07/2026", escribe "Miércoles 15/07", jamás "Lunes 15/07".
 - Los días que faltan para una carrera están indicados en la sección de carreras: no los recalcules.
+- Cuánto hace de cada entreno ya viene calculado entre paréntesis ("HOY", "AYER", "hace 3 días"). Cópialo tal cual; NUNCA restes fechas tú.
+- Cada mensaje del atleta lleva delante un sello [Escrito el ... — HOY/AYER/hace N días]. Las palabras "hoy", "ayer", "mañana" de ese mensaje se refieren a la fecha del sello, NO a hoy. Un mensaje de hace 2 días que dice "hoy he hecho series" significa que las series fueron hace 2 días. Nunca menciones ni copies el sello en tu respuesta.
+- Si en la conversación ya se habló de un entreno, sitúalo por su fecha real: no lo llames "el de hoy" si no es de hoy.
 - Un error de día de la semana es un fallo grave: el atleta planifica su vida con esto.
 
 Últimos 5 entrenamientos:
@@ -11796,7 +11836,7 @@ async function runWeekPlanFlow(startOffset){
     for(let k=src.length-1;k>=0;k--){
       const m=src[k];
       const lim=m.role==='user'?1200:4000;
-      const c=String(m.content).substring(0,lim);
+      const c=(m.role==='user'?selloFechaMsg(m)+'\n':'')+String(m.content).substring(0,lim);
       if(total+c.length>12000) break;
       total+=c.length;
       out.unshift({role:m.role==='user'?'user':'assistant',content:c});
@@ -11893,7 +11933,7 @@ Fechas exactas: ${week.map(w=>w.date).join(', ')}. "ritmo" es el ritmo objetivo 
     typing?.remove();
     hideCoachWorking();
     aiMsg(reply,false,false,true); // skipPlanSave: la confirmación de guardar la damos aparte, con vista previa
-    S.chatHistory.push({role:'assistant',content:reply});
+    S.chatHistory.push({ts:Date.now(),role:'assistant',content:reply});
 
     // Vista previa antes de guardar — el plan NO se guarda solo. Se deja
     // pendiente hasta que el usuario confirme "Añadir a mi programación" o
@@ -12251,6 +12291,7 @@ Al final, DESPUÉS de todo el texto anterior, añade este bloque en una sola lí
           textContent = m.content.filter(b=>b.type==='text').map(b=>b.text).join(' ').substring(0, 400);
         }
         if(!textContent) return null;
+        if(m.role==='user') textContent=selloFechaMsg(m)+'\n'+textContent;
         return {role: m.role==='user'?'user':'assistant', content: textContent};
       })
       .filter(Boolean);
